@@ -16,7 +16,7 @@
         </button>
         <div id="connection-status" class="connection-status online">Online</div>
     </div>
-    
+
     <div class="header-controls">
         <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="theme-icon" fill="currentColor">
@@ -39,7 +39,10 @@
         <label for="input-text">Enter filenames (separate multiple files with commas):</label>
         <textarea id="input-text" placeholder="Enter the text here..."></textarea>
 
-        <button id="format-btn">Format Filenames</button>
+        <div class="button-container">
+            <button id="format-btn">Format Filenames</button>
+            <button id="clear-btn" class="clear-btn">Clear</button>
+        </div>
 
         <div class="output-container" id="output-container" style="display: none;">
             <label>Formatted Result:</label>
@@ -63,6 +66,7 @@
 
     <script src="https://s3.amazonaws.com/stitch-sdks/js/bundles/4.6.0/stitch.js"></script>
     <script src="theme.js"></script>
+    <script src="mongodb.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

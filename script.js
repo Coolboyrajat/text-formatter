@@ -1,3 +1,4 @@
+
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -8,6 +9,27 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+
+// Server-side code (Only runs if this file is executed with Node.js)
+if (typeof window === 'undefined') {
+    const express = require('express');
+    const path = require('path');
+    const app = express();
+    const PORT = process.env.PORT || 3000;
+
+    // Serve static files
+    app.use(express.static(__dirname));
+
+    // Send index.html for the root route
+    app.get('/', (req, res) => {
+        res.sendFile(path.join(__dirname, 'index.html'));
+    });
+
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server running at http://0.0.0.0:${PORT}`);
+    });
+}
+
 // Default mappings that will always be available and preserved
 const defaultSiteNameMapping = {
     'anilos': 'Anilos',
@@ -84,6 +106,17 @@ class VideoFilenameFormatter {
     }
     initEventListeners() {
         this.formatBtn.addEventListener('click', () => this.formatHandler());
+
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => this.clearInputHandler());
+            // Initially hide clear button
+            clearBtn.style.display = 'none';
+        }
+        
+        // Add input event listener for clear button visibility
+        this.inputText.addEventListener('input', () => this.updateClearButtonVisibility());
+
         this.manageSitesBtn.addEventListener('click', () => {
             this.populateSiteMappings();
             this.mappingError.style.display = 'none';
@@ -113,6 +146,7 @@ class VideoFilenameFormatter {
     }
     updateConnectionStatus() {
         this.isOnline = navigator.onLine;
+        
         // For MongoDB connection check
         if (this.isOnline && this.siteCollection) {
             this.connectionStatus.className = 'connection-status online';
@@ -126,6 +160,9 @@ class VideoFilenameFormatter {
             this.connectionStatus.className = 'connection-status offline';
             this.connectionStatus.textContent = 'Offline';
         }
+        
+        // Show a temporary notification when connection status changes
+        this.connectionStatus.classList.remove('collapsed');
 
         // Auto-hide the connection status after 5 seconds
         setTimeout(() => {
@@ -147,72 +184,70 @@ class VideoFilenameFormatter {
     }
     initMongoDB() {
         return __awaiter(this, void 0, void 0, function* () {
-            try {
-                if (!this.isOnline) {
-                    console.log('Offline mode: Using local storage and default mappings');
-                    return;
-                }
-                // MongoDB Atlas App ID - Replace this with your actual App ID from MongoDB Atlas
-                const APP_ID = 'your-mongodb-atlas-app-id'; // ← IMPORTANT: Replace with your real App ID
-                if (!APP_ID || APP_ID === 'your-mongodb-atlas-app-id') {
-                    console.log('No MongoDB App ID configured, using local storage');
-                    this.connectionStatus.textContent = 'MongoDB not configured';
-                    this.connectionStatus.className = 'connection-status offline';
-                    this.loadSavedMappings();
-                    return;
-                }
-                // Initialize the MongoDB Stitch App Client
-                const client = window.Stitch.initializeDefaultAppClient(APP_ID);
-                // Get a client for MongoDB Service with anonymous authentication
-                const mongodb = client.getServiceClient(window.Stitch.RemoteMongoClient.factory, 'mongodb-atlas');
-                // Get database and collection
-                this.db = mongodb.db('site_mappings_db');
-                this.siteCollection = this.db.collection('site_mappings');
-                // Try to authenticate anonymously
-                yield client.auth.loginWithCredential(new window.Stitch.AnonymousCredential());
-                console.log('Connected to MongoDB Atlas');
-                this.connectionStatus.textContent = 'Connected to MongoDB';
-                this.connectionStatus.className = 'connection-status online';
-                // Fetch mappings from database
-                yield this.loadMappingsFromDB();
-            }
-            catch (error) {
-                console.error('MongoDB connection error:', error);
-                this.connectionStatus.textContent = 'MongoDB Connection Failed';
+            // Always load local storage first for immediate response
+            this.loadSavedMappings();
+            
+            if (!this.isOnline) {
+                console.log('Offline mode: Using local storage and default mappings');
+                this.connectionStatus.textContent = 'Offline';
                 this.connectionStatus.className = 'connection-status offline';
-                // Fall back to local storage
-                this.loadSavedMappings();
+                return;
+            }
+            
+            // MongoDB Atlas App ID - Replace with your actual ID when deploying
+            const APP_ID = 'your-actual-mongodb-app-id';
+            
+            try {
+                // Initialize MongoDB using our helper
+                const result = yield window.MongoDBHelper.init(APP_ID);
+                
+                if (result.success) {
+                    this.siteCollection = true; // Just a flag to indicate we're connected
+                    this.connectionStatus.textContent = 'Connected to MongoDB';
+                    this.connectionStatus.className = 'connection-status online';
+                    console.log('Connected to MongoDB Atlas');
+                    
+                    // Fetch mappings from database
+                    yield this.loadMappingsFromDB();
+                } else {
+                    console.log('Using local storage only:', result.message);
+                    this.connectionStatus.textContent = 'Offline';
+                    this.connectionStatus.className = 'connection-status offline';
+                }
+            } catch (error) {
+                console.error('MongoDB connection error:', error);
+                this.connectionStatus.textContent = 'Offline';
+                this.connectionStatus.className = 'connection-status offline';
             }
         });
     }
     loadMappingsFromDB() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.isOnline || !this.siteCollection) {
+            if (!this.isOnline || !window.MongoDBHelper.isConnected()) {
                 // Fall back to local storage if offline or not connected
                 this.loadSavedMappings();
                 return;
             }
+            
             try {
-                const dbMappings = yield this.siteCollection.find({}).toArray();
-                if (dbMappings && dbMappings.length > 0) {
-                    // Convert array of documents to a key-value object
-                    const dbMappingsObj = {};
-                    dbMappings.forEach((mapping) => {
-                        dbMappingsObj[mapping.key] = mapping.value;
-                    });
+                const result = yield window.MongoDBHelper.getAllMappings();
+                
+                if (result.success && result.data) {
                     // Create a combined mapping with defaults and DB mappings
-                    const combinedMappings = Object.assign(Object.assign({}, defaultSiteNameMapping), dbMappingsObj);
+                    const combinedMappings = Object.assign(Object.assign({}, defaultSiteNameMapping), result.data);
+                    
                     // Sort the combined mappings alphabetically
                     const sortedKeys = Object.keys(combinedMappings).sort();
                     this.siteNameMapping = {};
+                    
                     // Rebuild the mapping with sorted keys
                     sortedKeys.forEach(key => {
                         this.siteNameMapping[key] = combinedMappings[key];
                     });
+                    
                     console.log('Loaded mappings from MongoDB');
                 }
-            }
-            catch (error) {
+            } catch (error) {
                 console.error('Error loading mappings from MongoDB:', error);
                 // Fall back to local storage
                 this.loadSavedMappings();
@@ -221,29 +256,26 @@ class VideoFilenameFormatter {
     }
     saveMappingsToDB(mappings) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!this.isOnline || !this.siteCollection) {
-                // Fall back to local storage if offline
-                localStorage.setItem('siteNameMappings', JSON.stringify(mappings));
+            // Always save to local storage for offline access
+            localStorage.setItem('siteNameMappings', JSON.stringify(mappings));
+            
+            if (!this.isOnline || !window.MongoDBHelper.isConnected()) {
+                // If offline or not connected, we already saved to localStorage
                 return false;
             }
+            
             try {
-                // First, delete all existing custom mappings
-                yield this.siteCollection.deleteMany({});
-                // Then insert all new mappings
-                const mappingsArray = Object.entries(mappings).map(([key, value]) => ({
-                    key: key,
-                    value: value
-                }));
-                if (mappingsArray.length > 0) {
-                    yield this.siteCollection.insertMany(mappingsArray);
+                const result = yield window.MongoDBHelper.saveMappings(mappings);
+                
+                if (result.success) {
+                    console.log('Saved mappings to MongoDB');
+                    return true;
+                } else {
+                    console.error('Failed to save to MongoDB:', result.message);
+                    return false;
                 }
-                console.log('Saved mappings to MongoDB');
-                return true;
-            }
-            catch (error) {
+            } catch (error) {
                 console.error('Error saving mappings to MongoDB:', error);
-                // Fall back to local storage
-                localStorage.setItem('siteNameMappings', JSON.stringify(mappings));
                 return false;
             }
         });
@@ -315,6 +347,19 @@ class VideoFilenameFormatter {
                 return `[${siteName}] - ${date} - ${performers} ${resolution}.mp4`;
             }
         }).join('\n');
+    }
+
+    clearInputHandler() {
+        this.inputText.value = '';
+        this.outputContainer.style.display = 'none';
+        this.updateClearButtonVisibility();
+    }
+    
+    updateClearButtonVisibility() {
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) {
+            clearBtn.style.display = this.inputText.value.trim() ? 'inline-block' : 'none';
+        }
     }
     formatHandler() {
         const input = this.inputText.value;
@@ -390,80 +435,111 @@ class VideoFilenameFormatter {
     validateInputs() {
         const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
         let hasError = false;
+        let hasVisibleInput = false;
+
         rows.forEach(row => {
-            const keyVal = row.querySelector('.site-key').value.trim();
-            const valueVal = row.querySelector('.site-value').value.trim();
-            if ((keyVal && !valueVal) || (!keyVal && valueVal)) {
-                hasError = true;
+            const keyInput = row.querySelector('.site-key');
+            const valueInput = row.querySelector('.site-value');
+            const keyVal = keyInput.value.trim();
+            const valueVal = valueInput.value.trim();
+
+            // Only validate if not currently focused
+            if (!keyInput.matches(':focus') && !valueInput.matches(':focus')) {
+                if ((keyVal && !valueVal) || (!keyVal && valueVal)) {
+                    hasError = true;
+                }
+            } else {
+                hasVisibleInput = true;
             }
         });
-        this.mappingError.style.display = hasError ? 'block' : 'none';
+
+        // Only show error if there's an error and no inputs are currently focused
+        this.mappingError.style.display = (hasError && !hasVisibleInput) ? 'block' : 'none';
         return !hasError;
     }
     addSiteMappingRow(key = '', value = '', isNew = true) {
         const row = document.createElement('div');
         row.className = 'site-row';
+        
+        // Create key input wrapper
+        const keyWrapper = document.createElement('div');
+        keyWrapper.className = 'input-wrapper';
+        
         const keyInput = document.createElement('input');
         keyInput.type = 'text';
         keyInput.className = 'site-key';
         keyInput.placeholder = 'Site Key';
         keyInput.value = key;
+        
+        // Create clear button for key input
+        const keyClearBtn = document.createElement('button');
+        keyClearBtn.className = 'clear-input';
+        keyClearBtn.textContent = '×';
+        keyClearBtn.type = 'button';
+        keyClearBtn.addEventListener('click', () => {
+            keyInput.value = '';
+            keyInput.focus();
+            this.validateInputs();
+        });
+
+        // Create arrow element
+        const arrow = document.createElement('span');
+        arrow.className = 'mapping-arrow';
+        arrow.textContent = '→';
+
+        // Create value input wrapper
+        const valueWrapper = document.createElement('div');
+        valueWrapper.className = 'input-wrapper';
+        
         const valueInput = document.createElement('input');
         valueInput.type = 'text';
         valueInput.className = 'site-value';
         valueInput.placeholder = 'Display Name';
         valueInput.value = value;
-        // Track if both fields have lost focus
-        let keyInputHasFocus = false;
-        let valueInputHasFocus = false;
-        // Add validation for key/value pair
-        const validateRow = () => {
-            // Only validate when both fields have lost focus
-            if (!keyInputHasFocus && !valueInputHasFocus) {
-                const keyVal = keyInput.value.trim();
-                const valueVal = valueInput.value.trim();
-                // If one field has value but the other doesn't, show error
-                if ((keyVal && !valueVal) || (!keyVal && valueVal)) {
-                    if (keyVal && !valueVal) {
-                        valueInput.style.border = '1px solid #e74c3c';
-                    }
-                    if (!keyVal && valueVal) {
-                        keyInput.style.border = '1px solid #e74c3c';
-                    }
-                    this.mappingError.style.display = 'block';
-                }
-                else {
-                    // If both fields have values or both are empty, don't show error
-                    keyInput.style.border = '1px solid var(--border-color)';
-                    valueInput.style.border = '1px solid var(--border-color)';
-                    this.mappingError.style.display = 'none';
-                }
-            }
-        };
+        
+        // Create clear button for value input
+        const valueClearBtn = document.createElement('button');
+        valueClearBtn.className = 'clear-input';
+        valueClearBtn.textContent = '×';
+        valueClearBtn.type = 'button';
+        valueClearBtn.addEventListener('click', () => {
+            valueInput.value = '';
+            valueInput.focus();
+            this.validateInputs();
+        });
+        
+        // Track inputs focus for validation
         keyInput.addEventListener('focus', () => {
-            keyInputHasFocus = true;
-            // Hide error message during typing
+            // Hide error message during input focus
             this.mappingError.style.display = 'none';
-            // Reset borders during typing
+            // Reset borders during focus
             keyInput.style.border = '1px solid var(--border-color)';
             valueInput.style.border = '1px solid var(--border-color)';
         });
+
         valueInput.addEventListener('focus', () => {
-            valueInputHasFocus = true;
-            // Hide error message during typing
+            // Hide error message during input focus
             this.mappingError.style.display = 'none';
-            // Reset borders during typing
+            // Reset borders during focus
             keyInput.style.border = '1px solid var(--border-color)';
             valueInput.style.border = '1px solid var(--border-color)';
         });
-        keyInput.addEventListener('blur', () => {
-            keyInputHasFocus = false;
-            setTimeout(validateRow, 100); // Small delay to check if other field is focused
+
+        // Only validate when user actually leaves both fields
+        keyInput.addEventListener('blur', (e) => {
+            // Check if the focus is moving to the clear button or the other input field
+            if (!row.contains(e.relatedTarget)) {
+                this.validateInputs();
+            }
         });
-        valueInput.addEventListener('blur', () => {
-            valueInputHasFocus = false;
-            setTimeout(validateRow, 100); // Small delay to check if other field is focused
+
+        valueInput.addEventListener('blur', (e) => {
+            // Check if the focus is moving to the clear button or the other input field
+            if (!row.contains(e.relatedTarget)) {
+                this.validateInputs();
+            }
         });
+
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-btn';
         removeBtn.textContent = 'X';
@@ -474,8 +550,16 @@ class VideoFilenameFormatter {
                 this.validateInputs();
             }, 300);
         });
-        row.appendChild(keyInput);
-        row.appendChild(valueInput);
+        // Append elements to their wrappers
+        keyWrapper.appendChild(keyInput);
+        keyWrapper.appendChild(keyClearBtn);
+        valueWrapper.appendChild(valueInput);
+        valueWrapper.appendChild(valueClearBtn);
+        
+        // Append wrappers and other elements to row
+        row.appendChild(keyWrapper);
+        row.appendChild(arrow);
+        row.appendChild(valueWrapper);
         row.appendChild(removeBtn);
         if (isNew) {
             this.siteMappingsContainer.appendChild(row);
@@ -504,10 +588,10 @@ class VideoFilenameFormatter {
                 canAddNew = false;
                 // Focus on the first empty input
                 if (!keyVal) {
-                    row.querySelector('.site-key').focus();
+                    row.querySelector('.input-wrapper .site-key').focus();
                 }
                 else {
-                    row.querySelector('.site-value').focus();
+                    row.querySelector('.input-wrapper .site-value').focus();
                 }
             }
         });
@@ -527,22 +611,22 @@ class VideoFilenameFormatter {
             const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
             let hasError = false;
             rows.forEach(row => {
-                const key = row.querySelector('.site-key').value.trim();
-                const value = row.querySelector('.site-value').value.trim();
+                const key = row.querySelector('.input-wrapper .site-key').value.trim();
+                const value = row.querySelector('.input-wrapper .site-value').value.trim();
                 if (!key && !value)
                     return;
                 if (!key || !value) {
                     hasError = true;
                     row.style.borderLeft = '3px solid #e74c3c';
                     if (!key)
-                        row.querySelector('.site-key').style.border = '1px solid #e74c3c';
+                        row.querySelector('.input-wrapper .site-key').style.border = '1px solid #e74c3c';
                     if (!value)
-                        row.querySelector('.site-value').style.border = '1px solid #e74c3c';
+                        row.querySelector('.input-wrapper .site-value').style.border = '1px solid #e74c3c';
                     return;
                 }
                 row.style.borderLeft = 'none';
-                row.querySelector('.site-key').style.border = '1px solid #ddd';
-                row.querySelector('.site-value').style.border = '1px solid #ddd';
+                row.querySelector('.input-wrapper .site-key').style.border = '1px solid #ddd';
+                row.querySelector('.input-wrapper .site-value').style.border = '1px solid #ddd';
                 newMappings[key] = value;
             });
             if (hasError) {
@@ -622,7 +706,9 @@ class VideoFilenameFormatter {
         }
     }
 }
-// Initialize the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new VideoFilenameFormatter();
-});
+// Initialize the application when DOM is loaded (only in browser environment)
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        new VideoFilenameFormatter();
+    });
+}

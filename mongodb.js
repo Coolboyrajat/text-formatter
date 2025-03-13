@@ -1,110 +1,114 @@
+
 "use strict";
-// MongoDB Client for browser environment
-// This file provides interfaces for TypeScript types
-// The actual MongoDB functionality is handled through Stitch SDK in script.ts
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.connectToDatabase = connectToDatabase;
-exports.getAllMappings = getAllMappings;
-exports.updateMappings = updateMappings;
-exports.createApiHandler = createApiHandler;
-// Connection URL - replace with your actual MongoDB connection URL
-const url = process.env.MONGODB_URI || '';
-const dbName = 'site_mappings_db';
-const collectionName = 'site_mappings';
-let cachedDb = null;
-// Connect to MongoDB
-function connectToDatabase() {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (cachedDb) {
-            return cachedDb;
+
+// MongoDB integration for browser environment
+window.MongoDBHelper = (function() {
+    // Database connection info
+    const dbName = 'site_mappings_db';
+    const collectionName = 'site_mappings';
+    
+    // Cache for database connection
+    let db = null;
+    let collection = null;
+    let client = null;
+    
+    // Check if we're online
+    const isOnline = () => navigator.onLine;
+    
+    // Initialize the MongoDB connection
+    async function init(appId) {
+        if (!isOnline() || !appId || appId === 'your-mongodb-atlas-app-id' || appId === 'your-actual-mongodb-app-id') {
+            console.log('MongoDB Helper: Offline mode or no App ID');
+            return { success: false, message: 'Offline mode or App ID not configured' };
         }
+        
         try {
-            const client = yield MongoClient.connect(url, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            }); // Cast as any for TypeScript compatibility
-            const db = client.db(dbName);
-            cachedDb = db;
-            console.log('Successfully connected to MongoDB');
-            return db;
+            // Initialize the MongoDB Stitch App Client
+            client = window.Stitch.initializeDefaultAppClient(appId);
+            
+            // Get MongoDB service client
+            const mongodb = client.getServiceClient(
+                window.Stitch.RemoteMongoClient.factory,
+                'mongodb-atlas'
+            );
+            
+            // Get database and collection
+            db = mongodb.db(dbName);
+            collection = db.collection(collectionName);
+            
+            // Try to authenticate anonymously
+            await client.auth.loginWithCredential(new window.Stitch.AnonymousCredential());
+            console.log('MongoDB Helper: Connected to Atlas');
+            
+            return { success: true, message: 'Connected to MongoDB' };
+        } catch (error) {
+            console.error('MongoDB Helper: Connection error', error);
+            return { success: false, message: 'Connection failed', error };
         }
-        catch (error) {
-            console.error('Failed to connect to MongoDB:', error);
-            throw error;
+    }
+    
+    // Get all mappings from the database
+    async function getAllMappings() {
+        if (!isOnline() || !collection) {
+            return { success: false, data: {} };
         }
-    });
-}
-// Get all site mappings
-function getAllMappings() {
-    return __awaiter(this, void 0, void 0, function* () {
+        
         try {
-            const db = yield connectToDatabase();
-            const collection = db.collection(collectionName);
-            const mappings = yield collection.find({}).toArray();
-            // Convert to key-value object
+            const mappings = await collection.find({}).toArray();
+            
+            // Convert array of documents to object
             const mappingsObject = {};
-            mappings.forEach((mapping) => {
-                mappingsObject[mapping.key] = mapping.value;
-            });
-            return mappingsObject;
+            if (mappings && mappings.length > 0) {
+                mappings.forEach(mapping => {
+                    mappingsObject[mapping.key] = mapping.value;
+                });
+            }
+            
+            return { success: true, data: mappingsObject };
+        } catch (error) {
+            console.error('MongoDB Helper: Error getting mappings', error);
+            return { success: false, error };
         }
-        catch (error) {
-            console.error('Error getting mappings:', error);
-            throw error;
+    }
+    
+    // Save mappings to the database
+    async function saveMappings(mappings) {
+        if (!isOnline() || !collection) {
+            return { success: false, message: 'Not connected to MongoDB' };
         }
-    });
-}
-// Add or update site mappings
-function updateMappings(mappings) {
-    return __awaiter(this, void 0, void 0, function* () {
+        
         try {
-            const db = yield connectToDatabase();
-            const collection = db.collection(collectionName);
             // Delete existing mappings
-            yield collection.deleteMany({});
-            // Insert new mappings
-            if (Object.keys(mappings).length > 0) {
-                const mappingsArray = Object.entries(mappings).map(([key, value]) => ({
-                    key,
-                    value
-                }));
-                yield collection.insertMany(mappingsArray);
+            await collection.deleteMany({});
+            
+            // Convert object to array of documents
+            const mappingsArray = Object.entries(mappings).map(([key, value]) => ({
+                key,
+                value
+            }));
+            
+            // Insert new mappings if there are any
+            if (mappingsArray.length > 0) {
+                await collection.insertMany(mappingsArray);
             }
-            return { success: true };
+            
+            return { success: true, message: 'Mappings saved to MongoDB' };
+        } catch (error) {
+            console.error('MongoDB Helper: Error saving mappings', error);
+            return { success: false, error };
         }
-        catch (error) {
-            console.error('Error updating mappings:', error);
-            throw error;
-        }
-    });
-}
-function createApiHandler(req, res) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            if (req.method === 'GET') {
-                const mappings = yield getAllMappings();
-                return res.json({ success: true, data: mappings });
-            }
-            else if (req.method === 'POST') {
-                const result = yield updateMappings(req.body);
-                return res.json({ success: true, message: 'Mappings updated successfully' });
-            }
-            else {
-                return res.status(405).json({ success: false, message: 'Method not allowed' });
-            }
-        }
-        catch (error) {
-            console.error('API error:', error);
-            return res.status(500).json({ success: false, message: 'Server error' });
-        }
-    });
-}
+    }
+    
+    // Check connection status
+    function isConnected() {
+        return isOnline() && collection !== null;
+    }
+    
+    // Public API
+    return {
+        init,
+        getAllMappings,
+        saveMappings,
+        isConnected
+    };
+})();
