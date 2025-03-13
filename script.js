@@ -305,7 +305,29 @@ class VideoFilenameFormatter {
     formatVideoInfo(input) {
         if (!input.trim())
             return "";
-        return input.split(',').map(file => file.trim()).filter(Boolean).map(file => {
+            
+        // Split by both commas and newlines
+        const files = input.split(/[,\n]/).map(file => file.trim()).filter(Boolean);
+        
+        // First, check for unmapped site names
+        const unmappedSites = [];
+        files.forEach(file => {
+            const parts = file.split('.');
+            if (parts.length >= 5) {
+                const siteKey = parts[0].toLowerCase();
+                if (!(siteKey in this.siteNameMapping)) {
+                    unmappedSites.push(siteKey);
+                }
+            }
+        });
+        
+        // If there are unmapped sites, show modal for mapping them
+        if (unmappedSites.length > 0) {
+            return this.handleUnmappedSites(unmappedSites, input);
+        }
+        
+        // Process input if all sites are mapped
+        return files.map(file => {
             const parts = file.split('.');
             if (parts.length < 5)
                 return `[Error] Invalid filename format: ${file}`;
@@ -348,6 +370,150 @@ class VideoFilenameFormatter {
             }
         }).join('\n');
     }
+    
+    handleUnmappedSites(unmappedSites, originalInput) {
+        // Open the site modal
+        this.populateSiteMappings();
+        this.siteModal.style.display = 'block';
+        
+        // Add alert message
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'unmapped-sites-alert';
+        alertDiv.innerHTML = `<strong>New site names detected!</strong><br>Please provide display names for the following site keys:`;
+        
+        // Get current site mappings to check which ones are already in the modal
+        const currentRows = this.siteMappingsContainer.querySelectorAll('.site-row');
+        const currentKeys = Array.from(currentRows).map(row => 
+            row.querySelector('.site-key').value.toLowerCase());
+        
+        // Add the unmapped sites to the modal if they don't already exist
+        unmappedSites.forEach(site => {
+            if (!currentKeys.includes(site)) {
+                const row = this.addSiteMappingRow(site, '', true);
+                row.classList.add('highlight-row');
+                
+                // Focus on the value input of the first unmapped site
+                if (site === unmappedSites[0]) {
+                    setTimeout(() => {
+                        const valueInput = row.querySelector('.site-value');
+                        valueInput.focus();
+                    }, 300);
+                }
+            }
+        });
+        
+        // Insert alert before the site mappings container
+        const modalContent = document.querySelector('.modal-content');
+        modalContent.insertBefore(alertDiv, this.siteMappingsContainer);
+        
+        // Modify save button to handle the pending format operation
+        const originalSaveBtnClickHandler = this.saveSitesBtn.onclick;
+        this.saveSitesBtn.onclick = () => {
+            // Check if all unmapped sites have values
+            let allMapped = true;
+            unmappedSites.forEach(site => {
+                const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
+                let found = false;
+                rows.forEach(row => {
+                    const keyInput = row.querySelector('.site-key');
+                    const valueInput = row.querySelector('.site-value');
+                    if (keyInput.value.toLowerCase() === site && valueInput.value.trim()) {
+                        found = true;
+                    }
+                });
+                if (!found) allMapped = false;
+            });
+            
+            if (allMapped) {
+                // Save the mappings
+                this.saveSiteMappingsHandler().then(() => {
+                    // Remove the alert
+                    if (alertDiv.parentNode) {
+                        alertDiv.parentNode.removeChild(alertDiv);
+                    }
+                    
+                    // Reset the save button handler
+                    this.saveSitesBtn.onclick = originalSaveBtnClickHandler;
+                    
+                    // Re-run the format operation
+                    const result = this.formatVideoInfo(originalInput);
+                    this.displayFormattedResult(result);
+                });
+            } else {
+                // Show error if not all unmapped sites have values
+                this.mappingError.textContent = 'Please provide display names for all unmapped sites.';
+                this.mappingError.style.display = 'block';
+            }
+        };
+        
+        return ""; // Return empty string as we're handling the display in the modal
+    }
+    
+    displayFormattedResult(result) {
+        this.copyBtnContainer.innerHTML = '';
+        this.resultElement.innerHTML = '';
+        
+        if (result && result.trim()) {
+            // Split the result into lines
+            const lines = result.split('\n').filter(line => line.trim());
+            
+            if (lines.length > 0) {
+                const resultFragment = document.createDocumentFragment();
+                
+                // Create numbered lines with copy buttons
+                lines.forEach((line, index) => {
+                    const lineContainer = document.createElement('div');
+                    lineContainer.className = 'result-line';
+                    
+                    // Line number
+                    const lineNumber = document.createElement('span');
+                    lineNumber.className = 'line-number';
+                    lineNumber.textContent = `${index + 1}. `;
+                    
+                    // Line content
+                    const lineContent = document.createElement('span');
+                    lineContent.className = 'line-content';
+                    lineContent.textContent = line;
+                    
+                    // Line copy button
+                    const lineCopyBtn = document.createElement('button');
+                    lineCopyBtn.className = 'line-copy-btn';
+                    lineCopyBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+                    lineCopyBtn.title = "Copy this line";
+                    lineCopyBtn.addEventListener('click', () => {
+                        navigator.clipboard.writeText(line).then(() => {
+                            lineCopyBtn.classList.add('copied');
+                            setTimeout(() => {
+                                lineCopyBtn.classList.remove('copied');
+                            }, 2000);
+                        });
+                    });
+                    
+                    // Append elements to line container
+                    lineContainer.appendChild(lineNumber);
+                    lineContainer.appendChild(lineContent);
+                    lineContainer.appendChild(lineCopyBtn);
+                    
+                    // Add line to result
+                    resultFragment.appendChild(lineContainer);
+                });
+                
+                this.resultElement.appendChild(resultFragment);
+                this.outputContainer.style.display = 'block';
+                
+                // Add copy all button if there are multiple lines or even just one valid line
+                if (!result.includes('[Error]')) {
+                    this.copyBtnContainer.appendChild(this.createCopyButton(lines.join('\n')));
+                }
+            } else {
+                this.resultElement.textContent = 'No valid input provided.';
+                this.outputContainer.style.display = 'block';
+            }
+        } else {
+            this.resultElement.textContent = 'No valid input provided.';
+            this.outputContainer.style.display = 'block';
+        }
+    }
 
     clearInputHandler() {
         this.inputText.value = '';
@@ -364,26 +530,20 @@ class VideoFilenameFormatter {
     formatHandler() {
         const input = this.inputText.value;
         const result = this.formatVideoInfo(input);
-        this.copyBtnContainer.innerHTML = '';
-        if (result) {
-            this.resultElement.textContent = result;
-            this.outputContainer.style.display = 'block';
-            if (!result.includes('[Error]') && result !== 'No valid input provided.') {
-                this.copyBtnContainer.appendChild(this.createCopyButton());
-            }
-        }
-        else {
-            this.resultElement.textContent = 'No valid input provided.';
-            this.outputContainer.style.display = 'block';
+        
+        // If there is a result, display it
+        if (result !== undefined && result !== null) {
+            this.displayFormattedResult(result);
         }
     }
-    createCopyButton() {
+    
+    createCopyButton(text) {
         const copyBtn = document.createElement('button');
         copyBtn.className = 'copy-btn';
         copyBtn.id = 'copy-btn';
-        copyBtn.textContent = 'Copy to Clipboard';
+        copyBtn.textContent = 'Copy All to Clipboard';
         copyBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(this.resultElement.textContent || '').then(() => {
+            navigator.clipboard.writeText(text || '').then(() => {
                 const originalText = copyBtn.textContent || '';
                 copyBtn.textContent = 'Copied!';
                 setTimeout(() => { copyBtn.textContent = originalText; }, 2000);
@@ -703,6 +863,26 @@ class VideoFilenameFormatter {
     updateThemeIcon(isDarkMode) {
         if (window.updateThemeIcon) {
             window.updateThemeIcon(isDarkMode, this.themeIcon);
+        } else {
+            // Fallback implementation if window.updateThemeIcon is not available
+            if (isDarkMode) {
+                this.themeIcon.innerHTML = `
+                    <path d="M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36c-0.98,1.37-2.58,2.26-4.4,2.26
+                    c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3z"/>
+                `;
+            } else {
+                this.themeIcon.innerHTML = `
+                    <path d="M12,18c-3.3,0-6-2.7-6-6s2.7-6,6-6s6,2.7,6,6S15.3,18,12,18zM12,8c-2.2,0-4,1.8-4,4c0,2.2,1.8,4,4,4c2.2,0,4-1.8,4-4C16,9.8,14.2,8,12,8z"/>
+                    <path d="M12,4c-0.6,0-1-0.4-1-1V1c0-0.6,0.4-1,1-1s1,0.4,1,1v2C13,3.6,12.6,4,12,4z"/>
+                    <path d="M12,24c-0.6,0-1-0.4-1-1v-2c0-0.6,0.4-1,1-1s1,0.4,1,1v2C13,23.6,12.6,24,12,24z"/>
+                    <path d="M5.6,6.6c-0.3,0-0.5-0.1-0.7-0.3L3.5,4.9c-0.4-0.4-0.4-1,0-1.4s1-0.4,1.4,0l1.4,1.4c0.4,0.4,0.4,1,0,1.4C6.2,6.5,5.9,6.6,5.6,6.6z"/>
+                    <path d="M19.8,20.8c-0.3,0-0.5-0.1-0.7-0.3l-1.4-1.4c-0.4-0.4-0.4-1,0-1.4s1-0.4,1.4,0l1.4,1.4c0.4,0.4,0.4,1,0,1.4C20.3,20.7,20,20.8,19.8,20.8z"/>
+                    <path d="M4,13H2c-0.6,0-1-0.4-1-1s0.4-1,1-1h2c0.6,0,1,0.4,1,1S4.6,13,4,13z"/>
+                    <path d="M22,13h-2c-0.6,0-1-0.4-1-1s0.4-1,1-1h2c0.6,0,1,0.4,1,1S22.6,13,22,13z"/>
+                    <path d="M4.2,20.8c-0.3,0-0.5-0.1-0.7-0.3c-0.4-0.4-0.4-1,0-1.4l1.4-1.4c0.4-0.4,1-0.4,1.4,0s0.4,1,0,1.4l-1.4,1.4C4.7,20.7,4.5,20.8,4.2,20.8z"/>
+                    <path d="M18.4,6.6c-0.3,0-0.5-0.1-0.7-0.3c-0.4-0.4-0.4-1,0-1.4l1.4-1.4c0.4-0.4,1-0.4,1.4,0s0.4,1,0,1.4l-1.4,1.4C18.9,6.5,18.6,6.6,18.4,6.6z"/>
+                `;
+            }
         }
     }
 }
