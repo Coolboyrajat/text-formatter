@@ -14,7 +14,7 @@ button:hover{transform:scale(1.05)}
 .result-line{display:flex;align-items:flex-start;margin-bottom:4px;position:relative;padding-right:30px;}
 .line-number{opacity:0.4;user-select:none;flex-shrink:0;margin-right:4px;font-family:monospace;}
 .line-content{flex-grow:1;word-break:break-all;}
-.line-copy-btn{background:none;border:none;padding:2px;cursor:pointer;opacity:0.6;position:absolute;right:0;top:0;display:flex;align-items:center;justify-content:center;color:var(--text-color);transition:opacity 0.2s;}
+.line-copy-btn{background:none;border:none;padding:2px;cursor:pointer;opacity:0.6;position:absolute;right:0;top:0;display:flex;align-items:center;justify-content:center;color:var(--text-color);transition:opacity 0.2s;margin:0 0 0 10px;}
 .line-copy-btn:hover{opacity:1;transform:none;}
 .line-copy-btn.copied{color:#27ae60;}
 .result-line:hover .line-copy-btn{opacity:0.8;}.copy-btn{background-color:#27ae60}.copy-btn:hover{background-color:#219653}
