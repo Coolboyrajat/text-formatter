@@ -314,7 +314,8 @@ class VideoFilenameFormatter {
         const uniqueSiteKeys = new Set();
         
         files.forEach(file => {
-            const parts = file.split('.');
+            // Support both period and space delimited formats
+            const parts = file.includes('.') ? file.split('.') : file.split(' ');
             if (parts.length >= 5) {
                 const siteKey = parts[0].toLowerCase();
                 if (!(siteKey in this.siteNameMapping) && !uniqueSiteKeys.has(siteKey)) {
@@ -331,23 +332,54 @@ class VideoFilenameFormatter {
         
         // Process input if all sites are mapped
         return files.map(file => {
-            const parts = file.split('.');
+            // Support both period and space delimited formats
+            const parts = file.includes('.') ? file.split('.') : file.split(' ');
             if (parts.length < 5)
                 return `[Error] Invalid filename format: ${file}`;
+                
             const siteName = parts[0] in this.siteNameMapping
                 ? this.siteNameMapping[parts[0]]
                 : parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-            const date = parts.slice(1, 4).join('.');
+                
+            // Format date properly (with periods for most sites, spaces for OnlyFans)
+            const dateElements = parts.slice(1, 4);
+            // Use spaces for OnlyFans date format, periods for all other sites
+            const date = parts[0].toLowerCase() === 'onlyfans' ? 
+                dateElements.join(' ') : dateElements.join('.');
+            
             const has4K = parts.some(part => part.toLowerCase() === '4k');
-            const performerParts = parts.slice(4, parts.length - 1).filter(part => part.toLowerCase() !== '4k');
+            
+            // Determine original file extension
+            let originalExtension = 'mp4'; // Default
+            for (const part of parts) {
+                // Check for file extensions or patterns like WMV-LEWD
+                if (/^(mp4|wmv|avi|mov|mkv)$/i.test(part)) {
+                    originalExtension = part.toLowerCase();
+                    break;
+                } else if (/^(mp4|wmv|avi|mov|mkv)-\w+$/i.test(part)) {
+                    // Extract extension from patterns like WMV-LEWD
+                    originalExtension = part.split('-')[0].toLowerCase();
+                    break;
+                }
+            }
+            
+            // Get all parts except for resolution and file extension
+            const performerParts = parts.slice(4).filter(part => 
+                !['4k', 'xxx', '1080p', '2160p', '720p', '480p', 'mp4', 'wmv', 'avi', 'mov', 'mkv'].includes(part.toLowerCase()) && 
+                !/(mp4|wmv|avi|mov|mkv)-\w+/i.test(part)); // Filter out extension-XXX patterns
+                
             const performers = performerParts.map(name => name.charAt(0).toUpperCase() + name.slice(1)).join(' ');
+            
             let resolution = '1080p';
-            if (has4K) {
+            
+            // Check for 2160p or 4K in the parts
+            const has2160p = parts.some(part => part.toLowerCase() === '2160p');
+            
+            if (has4K || has2160p) {
                 resolution = '[2160p][4K]';
             }
             else {
                 const resolutionMap = {
-                    '2160p': '[2160p]',
                     '1080p': '1080p',
                     '720p': '720p',
                     '480p': '480p'
@@ -360,16 +392,17 @@ class VideoFilenameFormatter {
                     }
                 }
             }
+            
             // Make sure we don't duplicate the resolution in the filename
             const filenameParts = performers.split(' ');
             const containsResolution = filenameParts.some(part => part.toLowerCase() === resolution.toLowerCase());
             if (containsResolution) {
                 // If performers already contains the resolution, remove it to avoid duplication
                 const filteredPerformers = filenameParts.filter(part => part.toLowerCase() !== resolution.toLowerCase()).join(' ');
-                return `[${siteName}] - ${date} - ${filteredPerformers} ${resolution}.mp4`;
+                return `[${siteName}] - ${date} ${parts[0].toLowerCase() === 'onlyfans' ? '' : '- '}${filteredPerformers} ${resolution}.${originalExtension}`;
             }
             else {
-                return `[${siteName}] - ${date} - ${performers} ${resolution}.mp4`;
+                return `[${siteName}] - ${date} ${parts[0].toLowerCase() === 'onlyfans' ? '' : '- '}${performers} ${resolution}.${originalExtension}`;
             }
         }).join('\n');
     }
