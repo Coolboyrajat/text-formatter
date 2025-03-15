@@ -309,138 +309,67 @@ class VideoFilenameFormatter {
         // Split by both commas and newlines
         const files = input.split(/[,\n]/).map(file => file.trim()).filter(Boolean);
         
-        // Process each file
-        return files.map(file => {
-            // Determine if file has spaces or periods as separators
-            const hasSpaces = file.includes(' ') && file.split(' ').length > 3;
-            const hasPeriods = file.includes('.') && file.split('.').length > 3;
-            
-            if (!hasSpaces && !hasPeriods) {
-                return `[Error] Invalid filename format: ${file}`;
-            }
-            
-            let siteName, date, title, resolution;
-            
-            if (hasPeriods) {
-                // Handle period-separated format (original logic)
-                const parts = file.split('.');
-                
-                // Check for unmapped site name, but continue processing anyway
+        // First, check for unmapped site names
+        const unmappedSites = [];
+        const uniqueSiteKeys = new Set();
+        
+        files.forEach(file => {
+            const parts = file.split('.');
+            if (parts.length >= 5) {
                 const siteKey = parts[0].toLowerCase();
-                siteName = siteKey in this.siteNameMapping
-                    ? this.siteNameMapping[siteKey]
-                    : parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-                    
-                date = parts.slice(1, 4).join('.');
-                const has4K = parts.some(part => part.toLowerCase() === '4k');
-                const performerParts = parts.slice(4).filter(part => 
-                    part.toLowerCase() !== '4k' && 
-                    !['2160p', '1080p', '720p', '480p'].includes(part.toLowerCase())
-                );
-                title = performerParts.map(name => name.charAt(0).toUpperCase() + name.slice(1)).join(' ');
-                
-                // Determine resolution
-                resolution = '1080p';
-                if (has4K) {
-                    resolution = '[2160p][4K]';
-                } else {
-                    const resolutionMap = {
-                        '2160p': '[2160p]',
-                        '1080p': '1080p',
-                        '720p': '720p',
-                        '480p': '480p'
-                    };
-                    for (const part of parts) {
-                        const lowerPart = part.toLowerCase();
-                        if (lowerPart in resolutionMap) {
-                            resolution = resolutionMap[lowerPart];
-                            break;
-                        }
-                    }
+                if (!(siteKey in this.siteNameMapping) && !uniqueSiteKeys.has(siteKey)) {
+                    uniqueSiteKeys.add(siteKey);
+                    unmappedSites.push(siteKey);
                 }
-            } else {
-                // Handle space-separated format (new logic)
-                const parts = file.split(' ');
-                
-                // Site name is the first part
-                const siteKey = parts[0].toLowerCase();
-                siteName = siteKey in this.siteNameMapping
-                    ? this.siteNameMapping[siteKey]
-                    : parts[0];
-                
-                // Try to detect if the next 3 parts are dates
-                const datePattern = /^(\d{2})$/;  // Match 2 digits
-                let dateIndex = -1;
-                
-                // Look for 3 consecutive date parts
-                for (let i = 1; i < parts.length - 2; i++) {
-                    if (datePattern.test(parts[i]) && 
-                        datePattern.test(parts[i+1]) && 
-                        datePattern.test(parts[i+2])) {
-                        dateIndex = i;
+            }
+        });
+        
+        // If there are unmapped sites, show modal for mapping them
+        if (unmappedSites.length > 0) {
+            return this.handleUnmappedSites(unmappedSites, input);
+        }
+        
+        // Process input if all sites are mapped
+        return files.map(file => {
+            const parts = file.split('.');
+            if (parts.length < 5)
+                return `[Error] Invalid filename format: ${file}`;
+            const siteName = parts[0] in this.siteNameMapping
+                ? this.siteNameMapping[parts[0]]
+                : parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            const date = parts.slice(1, 4).join('.');
+            const has4K = parts.some(part => part.toLowerCase() === '4k');
+            const performerParts = parts.slice(4, parts.length - 1).filter(part => part.toLowerCase() !== '4k');
+            const performers = performerParts.map(name => name.charAt(0).toUpperCase() + name.slice(1)).join(' ');
+            let resolution = '1080p';
+            if (has4K) {
+                resolution = '[2160p][4K]';
+            }
+            else {
+                const resolutionMap = {
+                    '2160p': '[2160p]',
+                    '1080p': '1080p',
+                    '720p': '720p',
+                    '480p': '480p'
+                };
+                for (const part of parts) {
+                    const lowerPart = part.toLowerCase();
+                    if (lowerPart in resolutionMap) {
+                        resolution = resolutionMap[lowerPart];
                         break;
                     }
                 }
-                
-                if (dateIndex > 0) {
-                    // Format date parts with periods
-                    date = [parts[dateIndex], parts[dateIndex+1], parts[dateIndex+2]].join('.');
-                    
-                    // Title starts after date parts
-                    const titleParts = parts.slice(dateIndex + 3).filter(part => {
-                        const lowerPart = part.toLowerCase();
-                        return !['xxx', 'mp4', 'mkv', 'wmv', 'mp4-wrb'].includes(lowerPart) &&
-                               !lowerPart.includes('1080p') &&
-                               !lowerPart.includes('2160p') &&
-                               !lowerPart.includes('720p') &&
-                               !lowerPart.includes('480p');
-                    });
-                    
-                    title = titleParts.join(' ');
-                } else {
-                    // Fallback: assume no date format, just studio and title
-                    title = parts.slice(1).join(' ');
-                    date = 'XX.XX.XX'; // Placeholder
-                }
-                
-                // Detect resolution
-                resolution = '1080p'; // Default
-                if (file.toLowerCase().includes('2160p') || file.toLowerCase().includes('4k')) {
-                    resolution = '[2160p][4K]';
-                } else if (file.toLowerCase().includes('1080p')) {
-                    resolution = '1080p';
-                } else if (file.toLowerCase().includes('720p')) {
-                    resolution = '720p';
-                } else if (file.toLowerCase().includes('480p')) {
-                    resolution = '480p';
-                }
             }
-            
-            // Make sure we don't duplicate the resolution in the title
-            const titleParts = title.split(' ');
-            const containsResolution = titleParts.some(part => 
-                part.toLowerCase() === resolution.toLowerCase() || 
-                part.toLowerCase() === '1080p' ||
-                part.toLowerCase() === '2160p' ||
-                part.toLowerCase() === '720p' ||
-                part.toLowerCase() === '480p' ||
-                part.toLowerCase() === '4k'
-            );
-            
+            // Make sure we don't duplicate the resolution in the filename
+            const filenameParts = performers.split(' ');
+            const containsResolution = filenameParts.some(part => part.toLowerCase() === resolution.toLowerCase());
             if (containsResolution) {
-                // Remove resolution from title to avoid duplication
-                const filteredTitle = titleParts.filter(part => 
-                    part.toLowerCase() !== resolution.toLowerCase() &&
-                    part.toLowerCase() !== '1080p' &&
-                    part.toLowerCase() !== '2160p' &&
-                    part.toLowerCase() !== '720p' &&
-                    part.toLowerCase() !== '480p' &&
-                    part.toLowerCase() !== '4k'
-                ).join(' ');
-                
-                return `[${siteName}] - ${date} - ${filteredTitle} ${resolution}.mp4`;
-            } else {
-                return `[${siteName}] - ${date} - ${title} ${resolution}.mp4`;
+                // If performers already contains the resolution, remove it to avoid duplication
+                const filteredPerformers = filenameParts.filter(part => part.toLowerCase() !== resolution.toLowerCase()).join(' ');
+                return `[${siteName}] - ${date} - ${filteredPerformers} ${resolution}.mp4`;
+            }
+            else {
+                return `[${siteName}] - ${date} - ${performers} ${resolution}.mp4`;
             }
         }).join('\n');
     }
@@ -460,14 +389,17 @@ class VideoFilenameFormatter {
         const currentKeys = Array.from(currentRows).map(row => 
             row.querySelector('.site-key').value.toLowerCase());
         
-        // Add the unmapped sites to the modal if they don't already exist
-        unmappedSites.forEach(site => {
+        // Deduplicate unmapped sites before adding to modal
+        const uniqueUnmappedSites = [...new Set(unmappedSites)];
+        
+        // Add the unique unmapped sites to the modal if they don't already exist
+        uniqueUnmappedSites.forEach(site => {
             if (!currentKeys.includes(site)) {
                 const row = this.addSiteMappingRow(site, '', true);
                 row.classList.add('highlight-row');
                 
                 // Focus on the value input of the first unmapped site
-                if (site === unmappedSites[0]) {
+                if (site === uniqueUnmappedSites[0]) {
                     setTimeout(() => {
                         const valueInput = row.querySelector('.site-value');
                         valueInput.focus();
