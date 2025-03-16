@@ -365,7 +365,7 @@ class VideoFilenameFormatter {
             
             // Get all parts except for resolution and file extension
             const performerParts = parts.slice(4).filter(part => 
-                !['4k', 'xxx', '1080p', '2160p', '720p', '480p', 'mp4', 'wmv', 'avi', 'mov', 'mkv'].includes(part.toLowerCase()) && 
+                !['4k', 'xxx', '1080p', '2160p', '720p', '480p', 'mp4', 'wmv', 'avi', 'mov', 'mkv', '[xc]'].includes(part.toLowerCase()) && 
                 !/(mp4|wmv|avi|mov|mkv)-\w+/i.test(part)); // Filter out extension-XXX patterns
                 
             const performers = performerParts.map(name => name.charAt(0).toUpperCase() + name.slice(1)).join(' ');
