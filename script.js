@@ -654,13 +654,17 @@ class VideoFilenameFormatter {
                     // Line copy button
                     const lineCopyBtn = document.createElement('button');
                     lineCopyBtn.className = 'line-copy-btn';
-                    lineCopyBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+                    const copyIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+                    const tickIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+                    lineCopyBtn.innerHTML = copyIcon;
                     lineCopyBtn.title = "Copy this line";
                     lineCopyBtn.addEventListener('click', () => {
                         navigator.clipboard.writeText(line).then(() => {
                             lineCopyBtn.classList.add('copied');
+                            lineCopyBtn.innerHTML = tickIcon;
                             setTimeout(() => {
                                 lineCopyBtn.classList.remove('copied');
+                                lineCopyBtn.innerHTML = copyIcon;
                             }, 2000);
                         });
                     });
@@ -717,12 +721,27 @@ class VideoFilenameFormatter {
         const copyBtn = document.createElement('button');
         copyBtn.className = 'copy-btn';
         copyBtn.id = 'copy-btn';
-        copyBtn.textContent = 'Copy All to Clipboard';
+        
+        // Create copy text with icon
+        const copySpan = document.createElement('span');
+        copySpan.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" style="margin-right: 5px; vertical-align: middle;"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> Copy All to Clipboard';
+        
+        // Create success text with icon
+        const copiedSpan = document.createElement('span');
+        copiedSpan.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" style="margin-right: 5px; vertical-align: middle;"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Copied!';
+        
+        copyBtn.appendChild(copySpan);
+        
         copyBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(text || '').then(() => {
-                const originalText = copyBtn.textContent || '';
-                copyBtn.textContent = 'Copied!';
-                setTimeout(() => { copyBtn.textContent = originalText; }, 2000);
+                copySpan.style.display = 'none';
+                copiedSpan.style.display = 'inline';
+                copyBtn.appendChild(copiedSpan);
+                
+                setTimeout(() => { 
+                    copiedSpan.style.display = 'none';
+                    copySpan.style.display = 'inline';
+                }, 2000);
             });
         });
         return copyBtn;
