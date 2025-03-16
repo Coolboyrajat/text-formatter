@@ -314,13 +314,33 @@ class VideoFilenameFormatter {
         const uniqueSiteKeys = new Set();
         
         files.forEach(file => {
-            // Support both period and space delimited formats
-            const parts = file.includes('.') ? file.split('.') : file.split(' ');
-            if (parts.length >= 5) {
-                const siteKey = parts[0].toLowerCase();
+            // Check if this is the new format: "Site - Performer - Title (DD.MM.YYYY)"
+            const newFormatMatch = file.match(/^([^-]+)\s*-\s*.+\s*\((\d{2})\.(\d{2})\.(\d{4})\)/);
+            
+            // Check if this is the bracket format: "[Site] (Performer) MM-DD-YY"
+            const bracketFormatMatch = file.match(/^\[([^\]]+)\]\s*\(([^)]+)\)\s*(\d{2})-(\d{2})-(\d{2})/);
+            
+            if (newFormatMatch) {
+                const siteKey = newFormatMatch[1].trim().toLowerCase();
                 if (!(siteKey in this.siteNameMapping) && !uniqueSiteKeys.has(siteKey)) {
                     uniqueSiteKeys.add(siteKey);
                     unmappedSites.push(siteKey);
+                }
+            } else if (bracketFormatMatch) {
+                const siteKey = bracketFormatMatch[1].trim().toLowerCase();
+                if (!(siteKey in this.siteNameMapping) && !uniqueSiteKeys.has(siteKey)) {
+                    uniqueSiteKeys.add(siteKey);
+                    unmappedSites.push(siteKey);
+                }
+            } else {
+                // Support both period and space delimited formats for traditional format
+                const parts = file.includes('.') ? file.split('.') : file.split(' ');
+                if (parts.length >= 5) {
+                    const siteKey = parts[0].toLowerCase();
+                    if (!(siteKey in this.siteNameMapping) && !uniqueSiteKeys.has(siteKey)) {
+                        uniqueSiteKeys.add(siteKey);
+                        unmappedSites.push(siteKey);
+                    }
                 }
             }
         });
@@ -332,7 +352,112 @@ class VideoFilenameFormatter {
         
         // Process input if all sites are mapped
         return files.map(file => {
-            // Support both period and space delimited formats
+            // Check if this is the new format: "Site - Performer - Title (DD.MM.YYYY)"
+            const newFormatMatch = file.match(/^([^-]+)\s*-\s*(.+?)\s*\((\d{2})\.(\d{2})\.(\d{4})\)(.*)\.([^.]+)$/);
+            
+            // Check if this is the bracket format: "[Site] (Performer) MM-DD-YY"
+            const bracketFormatMatch = file.match(/^\[([^\]]+)\]\s*\(([^)]+)\)\s*(\d{2})-(\d{2})-(\d{2}).*?(XXX)?.*?(?:\(([^)]*)\))?.*?\.([^.]+)$/i);
+            
+            if (bracketFormatMatch) {
+                // Process bracket format
+                const site = bracketFormatMatch[1].trim();
+                const performer = bracketFormatMatch[2].trim();
+                const month = bracketFormatMatch[3];
+                const day = bracketFormatMatch[4];
+                const year = bracketFormatMatch[5];
+                const hasXXX = !!bracketFormatMatch[6];
+                const additionalInfo = bracketFormatMatch[7] || '';
+                const extension = bracketFormatMatch[8].toLowerCase();
+                
+                // Format date properly in YY.MM.DD format
+                // Reverse the order to match the expected output format: DD.MM.YY
+                const date = `${year}.${month}.${day}`;
+                
+                // Get proper site name from mapping
+                const siteName = site.toLowerCase() in this.siteNameMapping
+                    ? this.siteNameMapping[site.toLowerCase()]
+                    : site;
+                
+                // Determine resolution
+                let resolution = '1080p';
+                if (additionalInfo) {
+                    if (additionalInfo.toLowerCase().includes('4k') || additionalInfo.toLowerCase().includes('2160p')) {
+                        resolution = '[2160p][4K]';
+                    } else if (additionalInfo.toLowerCase().includes('720p')) {
+                        resolution = '720p';
+                    } else if (additionalInfo.toLowerCase().includes('480p')) {
+                        resolution = '480p';
+                    }
+                }
+                
+                // Format performer name properly (capitalize each word)
+                const formattedPerformer = performer
+                    .split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                    .join(' ');
+                
+                // OnlyFans format handling
+                const isTonightsGirlfriend = siteName.toLowerCase() === 'tonightsgirlfriend';
+                
+                // For TonightsGirlfriend, include the dash after site name
+                return `[${siteName}] - ${date} - ${formattedPerformer} ${resolution}.${extension}`;
+            }
+            else if (newFormatMatch) {
+                // Process new format
+                const site = newFormatMatch[1].trim();
+                const siteName = site.toLowerCase() in this.siteNameMapping
+                    ? this.siteNameMapping[site.toLowerCase()]
+                    : site.charAt(0).toUpperCase() + site.slice(1);
+                
+                const restOfTitle = newFormatMatch[2].trim();
+                const day = newFormatMatch[3];
+                const month = newFormatMatch[4];
+                const year = newFormatMatch[5].slice(2); // Extract last 2 digits of year
+                const additionalInfo = newFormatMatch[6].trim();
+                const extension = newFormatMatch[7].toLowerCase();
+                
+                // Format date properly in YY.MM.DD format
+                const date = `${year}.${month}.${day}`;
+                
+                // Parse additional tags like rq, 1080p, etc.
+                const tags = [];
+                if (additionalInfo) {
+                    const tagMatches = additionalInfo.match(/\b(rq|4k|1080p|720p|480p|2160p)\b/gi);
+                    if (tagMatches) {
+                        tagMatches.forEach(tag => {
+                            const normalizedTag = tag.toLowerCase();
+                            if (!tags.includes(normalizedTag)) tags.push(normalizedTag);
+                        });
+                    }
+                }
+                
+                // Determine resolution or quality tags
+                let resolution = '1080p';
+                if (tags.includes('4k') || tags.includes('2160p')) {
+                    resolution = '[2160p][4K]';
+                } else if (tags.includes('1080p')) {
+                    resolution = '1080p';
+                } else if (tags.includes('720p')) {
+                    resolution = '720p';
+                } else if (tags.includes('480p')) {
+                    resolution = '480p';
+                }
+                
+                // Add rq tag if present and remove resolution if it's the default 1080p
+                let qualityInfo = tags.includes('rq') ? ' [rq]' : '';
+                let finalResolution = resolution;
+                
+                // If rq tag is present and resolution is the default 1080p, don't include the resolution
+                if (tags.includes('rq') && resolution === '1080p') {
+                    finalResolution = '';
+                } else {
+                    finalResolution = resolution + ' ';
+                }
+                
+                return `[${siteName}] - ${date} - ${restOfTitle}${finalResolution}${qualityInfo}.${extension}`;
+            }
+            
+            // Handle traditional format
             const parts = file.includes('.') ? file.split('.') : file.split(' ');
             if (parts.length < 5)
                 return `[Error] Invalid filename format: ${file}`;
@@ -393,16 +518,28 @@ class VideoFilenameFormatter {
                 }
             }
             
+            // Check if [rq] tag is present in filename
+            const hasRqTag = parts.some(part => part.toLowerCase() === 'rq' || part.toLowerCase() === '[rq]');
+            
             // Make sure we don't duplicate the resolution in the filename
             const filenameParts = performers.split(' ');
             const containsResolution = filenameParts.some(part => part.toLowerCase() === resolution.toLowerCase());
-            if (containsResolution) {
-                // If performers already contains the resolution, remove it to avoid duplication
-                const filteredPerformers = filenameParts.filter(part => part.toLowerCase() !== resolution.toLowerCase()).join(' ');
-                return `[${siteName}] - ${date} ${parts[0].toLowerCase() === 'onlyfans' ? '' : '- '}${filteredPerformers} ${resolution}.${originalExtension}`;
-            }
-            else {
-                return `[${siteName}] - ${date} ${parts[0].toLowerCase() === 'onlyfans' ? '' : '- '}${performers} ${resolution}.${originalExtension}`;
+            
+            // Skip 1080p resolution if rq tag is present
+            let finalResolution = resolution;
+            if (hasRqTag && resolution === '1080p') {
+                finalResolution = '';
+                // Add [rq] tag
+                return `[${siteName}] - ${date} ${parts[0].toLowerCase() === 'onlyfans' ? '' : '- '}${performers} [rq].${originalExtension}`;
+            } else {
+                if (containsResolution) {
+                    // If performers already contains the resolution, remove it to avoid duplication
+                    const filteredPerformers = filenameParts.filter(part => part.toLowerCase() !== resolution.toLowerCase()).join(' ');
+                    return `[${siteName}] - ${date} ${parts[0].toLowerCase() === 'onlyfans' ? '' : '- '}${filteredPerformers} ${finalResolution}${hasRqTag ? ' [rq]' : ''}.${originalExtension}`;
+                }
+                else {
+                    return `[${siteName}] - ${date} ${parts[0].toLowerCase() === 'onlyfans' ? '' : '- '}${performers} ${finalResolution}${hasRqTag ? ' [rq]' : ''}.${originalExtension}`;
+                }
             }
         }).join('\n');
     }
