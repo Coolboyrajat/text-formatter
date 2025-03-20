@@ -114,8 +114,19 @@ class VideoFilenameFormatter {
             clearBtn.style.display = 'none';
         }
         
-        // Add input event listener for clear button visibility
-        this.inputText.addEventListener('input', () => this.updateClearButtonVisibility());
+        // Add input event listener for clear button visibility and auto newline
+        this.inputText.addEventListener('input', (e) => {
+            this.updateClearButtonVisibility();
+            
+            // Only add newline if the input is not empty and doesn't end with newline
+            const value = e.target.value;
+            if (value && !value.endsWith('\n')) {
+                e.target.value = value + '\n';
+                // Move cursor to the end
+                e.target.selectionStart = e.target.value.length;
+                e.target.selectionEnd = e.target.value.length;
+            }
+        });
 
         this.manageSitesBtn.addEventListener('click', () => {
             this.populateSiteMappings();
