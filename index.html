@@ -54,12 +54,20 @@
     <div id="site-modal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h2>Manage Site Name Mappings</h2>
-            <div id="site-mappings-container">
-                <!-- Site mappings will be added here -->
+            <div id="site-mappings-header">
+                <h2>Manage Site Name Mappings</h2>
+                <input type="text" id="search-box" placeholder="Search Sites">
             </div>
+             <div id="site-mappings-container">
+                 <!-- Site mappings will be added here -->
+            </div>      
+            <div id="no-result">No matching sites found</div>
             <div class="error-message" id="mapping-error">Both site key and display name are required.</div>
-            <button class="add-site-btn" id="add-site-btn">Add New Site</button>
+            <div id="site-mappings-count">
+                <span class="total-sites">Total Count : </span>
+                <span id="total-sites-count"></span>
+            </div>
+          <button class="add-site-btn" id="add-site-btn">Add New Site</button>
             <button class="save-sites-btn" id="save-sites-btn">Save Changes</button>
         </div>
     </div>

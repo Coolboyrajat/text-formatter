@@ -36,6 +36,7 @@ button:hover{transform:scale(1.05)}
 .save-sites-btn{background-color:#f39c12;margin-top:15px}
 .save-sites-btn:hover{background-color:#e67e22}
 .error-message{color:#e74c3c;font-size:14px;margin-top:5px;display:none}
+#search-box{margin-bottom: 1rem;}
 .bottom-controls{position:fixed;bottom:10px;right:20px;display:flex;align-items:center;gap:4px;z-index:100}
 .connection-status{padding:8px 15px;border-radius:20px;font-size:14px;font-weight:700;overflow:hidden;white-space:nowrap;animation:fadeInRight .5s ease-in-out}
 @keyframes fadeInRight{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}

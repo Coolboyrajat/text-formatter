@@ -65,6 +65,7 @@ const defaultSiteNameMapping = {
     'thepovgod': 'ThePOVGod',
     'youthlust': 'YouthLust'
 };
+
 // App class to encapsulate application logic
 class VideoFilenameFormatter {
     constructor() {
@@ -154,6 +155,34 @@ class VideoFilenameFormatter {
         window.addEventListener('offline', () => this.updateConnectionStatus());
         // Theme toggle
         this.themeToggle.addEventListener('click', () => this.toggleTheme());
+
+         // Search functionality
+         const searchBox = document.getElementById('search-box');
+         const noResultText = document.getElementById('no-result');
+         searchBox.addEventListener('input', () => {
+            const searchTerm = searchBox.value.trim().toLowerCase();
+            const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
+            let hasVisibleRows = false;
+            rows.forEach(row => {
+                const siteKey = row.querySelector('.site-key').value.toLowerCase();
+                const displayName = row.querySelector('.site-value').value.toLowerCase();
+                const isMatch = siteKey.includes(searchTerm) || displayName.includes(searchTerm);
+                row.style.display = isMatch ? 'flex' : 'none';
+                hasVisibleRows = hasVisibleRows || isMatch;
+            });
+            // Show "No Result" if no rows are visible
+            noResultText.style.display = hasVisibleRows ? 'none' : 'block';
+         });
+    }
+    countSiteMappings() {
+        // Get all the site mapping rows
+        const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
+        // Count them
+        const count = rows.length;
+        // Update the total-sites-count element
+        const totalCountElement = document.getElementById('total-sites-count');
+        if (totalCountElement)
+            totalCountElement.textContent = count.toString();
     }
     updateConnectionStatus() {
         this.isOnline = navigator.onLine;
@@ -232,65 +261,7 @@ class VideoFilenameFormatter {
             }
         });
     }
-    loadMappingsFromDB() {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.isOnline || !window.MongoDBHelper.isConnected()) {
-                // Fall back to local storage if offline or not connected
-                this.loadSavedMappings();
-                return;
-            }
-            
-            try {
-                const result = yield window.MongoDBHelper.getAllMappings();
-                
-                if (result.success && result.data) {
-                    // Create a combined mapping with defaults and DB mappings
-                    const combinedMappings = Object.assign(Object.assign({}, defaultSiteNameMapping), result.data);
-                    
-                    // Sort the combined mappings alphabetically
-                    const sortedKeys = Object.keys(combinedMappings).sort();
-                    this.siteNameMapping = {};
-                    
-                    // Rebuild the mapping with sorted keys
-                    sortedKeys.forEach(key => {
-                        this.siteNameMapping[key] = combinedMappings[key];
-                    });
-                    
-                    console.log('Loaded mappings from MongoDB');
-                }
-            } catch (error) {
-                console.error('Error loading mappings from MongoDB:', error);
-                // Fall back to local storage
-                this.loadSavedMappings();
-            }
-        });
-    }
-    saveMappingsToDB(mappings) {
-        return __awaiter(this, void 0, void 0, function* () {
-            // Always save to local storage for offline access
-            localStorage.setItem('siteNameMappings', JSON.stringify(mappings));
-            
-            if (!this.isOnline || !window.MongoDBHelper.isConnected()) {
-                // If offline or not connected, we already saved to localStorage
-                return false;
-            }
-            
-            try {
-                const result = yield window.MongoDBHelper.saveMappings(mappings);
-                
-                if (result.success) {
-                    console.log('Saved mappings to MongoDB');
-                    return true;
-                } else {
-                    console.error('Failed to save to MongoDB:', result.message);
-                    return false;
-                }
-            } catch (error) {
-                console.error('Error saving mappings to MongoDB:', error);
-                return false;
-            }
-        });
-    }
+
     loadSavedMappings() {
         const savedMappings = localStorage.getItem('siteNameMappings');
         if (savedMappings) {
@@ -313,6 +284,7 @@ class VideoFilenameFormatter {
             }
         }
     }
+    
     formatVideoInfo(input) {
         if (!input.trim())
             return "";
@@ -797,6 +769,7 @@ class VideoFilenameFormatter {
         entries.forEach(([key, value]) => {
             this.addSiteMappingRow(key, value, false);
         });
+        this.countSiteMappings();
     }
     validateInputs() {
         const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
@@ -912,6 +885,7 @@ class VideoFilenameFormatter {
         removeBtn.addEventListener('click', () => {
             row.style.opacity = '0';
             setTimeout(() => {
+                this.countSiteMappings();
                 row.remove();
                 this.validateInputs();
             }, 300);
@@ -941,6 +915,7 @@ class VideoFilenameFormatter {
         else {
             this.siteMappingsContainer.appendChild(row);
         }
+        this.countSiteMappings();
         return row;
     }
     addEmptySiteRow() {
@@ -1049,6 +1024,7 @@ class VideoFilenameFormatter {
             // Repopulate to ensure alphabetical order
             this.populateSiteMappings();
             this.siteModal.style.display = 'none';
+            this.countSiteMappings();
         });
     }
     initTheme() {
