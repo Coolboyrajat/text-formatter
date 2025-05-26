@@ -1,4 +1,3 @@
-
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -9,6 +8,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+
+// Import default mappings
+import { defaultSiteNameMapping } from './siteMappings.js';
 
 // Server-side code (Only runs if this file is executed with Node.js)
 if (typeof window === 'undefined') {
@@ -29,42 +31,6 @@ if (typeof window === 'undefined') {
         console.log(`Server running at http://0.0.0.0:${PORT}`);
     });
 }
-
-// Default mappings that will always be available and preserved
-const defaultSiteNameMapping = {
-    'anilos': 'Anilos',
-    'analvids': 'AnalVids',
-    'btb': 'BigTitsBoss',
-    'blacksonblondes': 'BlacksOnBlondes',
-    'brazzersexxtra': 'BrazzersExxtra',
-    'brattymilf': 'BrattyMILF',
-    'brattysis': 'BrattySis',
-    'clubsweethearts': 'ClubSweethearts',
-    'clips4sale': 'Clips4Sale',
-    'dirtyauditions': 'DirtyAuditions',
-    'dorcelclub': 'DorcelClub',
-    'evilangel': 'EvilAngel',
-    'exploitedteens': 'ExploitedTeens',
-    'familyxxx': 'FamilyXXX',
-    'hookuphotshot': 'HookupHotshot',
-    'julesjorder': 'JulesJordan',
-    'loan4k': 'Loan4K',
-    'maturenl': 'MatureNL',
-    'mysisterhotfriend': 'MySistersHotFriend',
-    'mydirtyhobby': 'MyDirtyHobby',
-    'mypervyfamily': 'MyPervyFamily',
-    'nublies': 'Nubiles',
-    'pornbox': 'PornBox',
-    'pornfidelity': 'PornFidelity',
-    'pornmegaload': 'PornMegaLoad',
-    'pornworld': 'PornWorld',
-    'povmasters': 'POVMasters',
-    'sexart': 'SexArt',
-    'sexmex': 'SexMex',
-    'swallowed': 'Swallowed',
-    'thepovgod': 'ThePOVGod',
-    'youthlust': 'YouthLust'
-};
 
 // App class to encapsulate application logic
 class VideoFilenameFormatter {
@@ -89,13 +55,9 @@ class VideoFilenameFormatter {
         this.addSiteBtn = document.getElementById('add-site-btn');
         this.saveSitesBtn = document.getElementById('save-sites-btn');
         this.mappingError = document.getElementById('mapping-error');
-        this.themeToggle = document.getElementById('theme-toggle');
-        this.themeIcon = document.getElementById('theme-icon');
         // Initialize event listeners
         this.initEventListeners();
         this.updateConnectionStatus();
-        // Apply saved theme if available
-        this.initTheme();
         // Initialize database connection
         this.initMongoDB().then(() => {
             console.log('MongoDB initialization complete');
@@ -153,8 +115,6 @@ class VideoFilenameFormatter {
             this.initMongoDB();
         });
         window.addEventListener('offline', () => this.updateConnectionStatus());
-        // Theme toggle
-        this.themeToggle.addEventListener('click', () => this.toggleTheme());
 
          // Search functionality
          const searchBox = document.getElementById('search-box');
@@ -543,7 +503,7 @@ class VideoFilenameFormatter {
             row.querySelector('.site-key').value.toLowerCase());
         
         // Deduplicate unmapped sites before adding to modal
-        const uniqueUnmappedSites = [...new Set(unmappedSites)];
+        const uniqueUnmappedSites = [...new Set(unmappedSites.map(site => site.toLowerCase()))];
         
         // Add the unique unmapped sites to the modal if they don't already exist
         uniqueUnmappedSites.forEach(site => {
@@ -570,33 +530,52 @@ class VideoFilenameFormatter {
         this.saveSitesBtn.onclick = () => {
             // Check if all unmapped sites have values
             let allMapped = true;
+            let hasError = false;
+            
             unmappedSites.forEach(site => {
                 const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
                 let found = false;
                 rows.forEach(row => {
                     const keyInput = row.querySelector('.site-key');
                     const valueInput = row.querySelector('.site-value');
-                    if (keyInput.value.toLowerCase() === site && valueInput.value.trim()) {
-                        found = true;
+                    if (keyInput.value.toLowerCase() === site.toLowerCase()) {
+                        if (valueInput.value.trim()) {
+                            found = true;
+                        } else {
+                            hasError = true;
+                            row.style.borderLeft = '3px solid #e74c3c';
+                            valueInput.style.border = '1px solid #e74c3c';
+                        }
                     }
                 });
                 if (!found) allMapped = false;
             });
             
+            if (hasError) {
+                this.mappingError.textContent = 'Please provide display names for all unmapped sites.';
+                this.mappingError.style.display = 'block';
+                return;
+            }
+            
             if (allMapped) {
                 // Save the mappings
-                this.saveSiteMappingsHandler().then(() => {
-                    // Remove the alert
-                    if (alertDiv.parentNode) {
-                        alertDiv.parentNode.removeChild(alertDiv);
+                this.saveSiteMappingsHandler().then((success) => {
+                    if (success) {
+                        // Remove the alert
+                        if (alertDiv.parentNode) {
+                            alertDiv.parentNode.removeChild(alertDiv);
+                        }
+                        
+                        // Reset the save button handler
+                        this.saveSitesBtn.onclick = originalSaveBtnClickHandler;
+                        
+                        // Re-run the format operation
+                        const result = this.formatVideoInfo(originalInput);
+                        this.displayFormattedResult(result);
+                        
+                        // Close the modal
+                        this.siteModal.style.display = 'none';
                     }
-                    
-                    // Reset the save button handler
-                    this.saveSitesBtn.onclick = originalSaveBtnClickHandler;
-                    
-                    // Re-run the format operation
-                    const result = this.formatVideoInfo(originalInput);
-                    this.displayFormattedResult(result);
                 });
             } else {
                 // Show error if not all unmapped sites have values
@@ -952,7 +931,7 @@ class VideoFilenameFormatter {
             const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
             let hasError = false;
             rows.forEach(row => {
-                const key = row.querySelector('.input-wrapper .site-key').value.trim();
+                const key = row.querySelector('.input-wrapper .site-key').value.trim().toLowerCase(); // Ensure lowercase for consistency
                 const value = row.querySelector('.input-wrapper .site-value').value.trim();
                 if (!key && !value)
                     return;
@@ -970,11 +949,15 @@ class VideoFilenameFormatter {
                 row.querySelector('.input-wrapper .site-value').style.border = '1px solid #ddd';
                 newMappings[key] = value;
             });
+            
             if (hasError) {
+                this.mappingError.textContent = 'Both site key and display name are required.';
                 this.mappingError.style.display = 'block';
                 return;
             }
+            
             this.mappingError.style.display = 'none';
+            
             // Create a final mapping that keeps the default mappings and adds/updates user mappings
             const customMappings = {};
             Object.keys(newMappings).sort().forEach(key => {
@@ -983,30 +966,36 @@ class VideoFilenameFormatter {
                     customMappings[key] = newMappings[key];
                 }
             });
-            // Save to database or localStorage based on connection status
+            
+            // Save to database if online
             let savedToDb = false;
-            if (this.isOnline) {
-                savedToDb = yield this.saveMappingsToDB(customMappings);
+            if (this.isOnline && this.siteCollection) {
+                try {
+                    savedToDb = yield this.saveMappingsToDB(customMappings);
+                } catch (error) {
+                    console.error('Error saving to database:', error);
+                }
             }
+            
             // Always save to localStorage as a backup
-            localStorage.setItem('siteNameMappings', JSON.stringify(customMappings));
+            try {
+                localStorage.setItem('siteNameMappings', JSON.stringify(customMappings));
+            } catch (error) {
+                console.error('Error saving to localStorage:', error);
+            }
+            
             // Update the working mapping with all values
-            this.siteNameMapping = {};
-            // First add defaults
-            for (const [key, value] of Object.entries(defaultSiteNameMapping)) {
-                this.siteNameMapping[key] = value;
-            }
-            // Then add/override with custom values
-            for (const [key, value] of Object.entries(newMappings)) {
-                this.siteNameMapping[key] = value;
-            }
+            this.siteNameMapping = Object.assign({}, defaultSiteNameMapping, newMappings);
+            
             // Sort the full mapping
+            const sortedKeys = Object.keys(this.siteNameMapping).sort();
             const sortedMapping = {};
-            Object.keys(this.siteNameMapping).sort().forEach(key => {
+            sortedKeys.forEach(key => {
                 sortedMapping[key] = this.siteNameMapping[key];
             });
             this.siteNameMapping = sortedMapping;
-            // Show a message to notify the user about the update
+            
+            // Show success message
             const updateNotice = document.createElement('div');
             updateNotice.style.backgroundColor = '#27ae60';
             updateNotice.style.color = 'white';
@@ -1016,56 +1005,21 @@ class VideoFilenameFormatter {
             updateNotice.style.textAlign = 'center';
             updateNotice.innerHTML = `Site mappings updated! <br>The mappings are now saved ${savedToDb ? 'to database' : 'locally'}.`;
             this.siteMappingsContainer.parentNode.insertBefore(updateNotice, this.siteMappingsContainer.nextSibling);
+            
+            // Remove notice after delay
             setTimeout(() => {
                 updateNotice.style.opacity = '0';
                 updateNotice.style.transition = 'opacity 0.5s ease';
                 setTimeout(() => updateNotice.remove(), 500);
             }, 3000);
-            // Repopulate to ensure alphabetical order
+            
+            // Repopulate to ensure alphabetical order and close modal
             this.populateSiteMappings();
             this.siteModal.style.display = 'none';
             this.countSiteMappings();
+            
+            return true; // Indicate successful save
         });
-    }
-    initTheme() {
-        // Check for saved theme preference or use device preference
-        const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        // Apply theme
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-            document.body.classList.add('dark-mode');
-            this.updateThemeIcon(true);
-        }
-    }
-    toggleTheme() {
-        const isDarkMode = document.body.classList.toggle('dark-mode');
-        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-        this.updateThemeIcon(isDarkMode);
-    }
-    updateThemeIcon(isDarkMode) {
-        if (window.updateThemeIcon) {
-            window.updateThemeIcon(isDarkMode, this.themeIcon);
-        } else {
-            // Fallback implementation if window.updateThemeIcon is not available
-            if (isDarkMode) {
-                this.themeIcon.innerHTML = `
-                    <path d="M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36c-0.98,1.37-2.58,2.26-4.4,2.26
-                    c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3z"/>
-                `;
-            } else {
-                this.themeIcon.innerHTML = `
-                    <path d="M12,18c-3.3,0-6-2.7-6-6s2.7-6,6-6s6,2.7,6,6S15.3,18,12,18zM12,8c-2.2,0-4,1.8-4,4c0,2.2,1.8,4,4,4c2.2,0,4-1.8,4-4C16,9.8,14.2,8,12,8z"/>
-                    <path d="M12,4c-0.6,0-1-0.4-1-1V1c0-0.6,0.4-1,1-1s1,0.4,1,1v2C13,3.6,12.6,4,12,4z"/>
-                    <path d="M12,24c-0.6,0-1-0.4-1-1v-2c0-0.6,0.4-1,1-1s1,0.4,1,1v2C13,23.6,12.6,24,12,24z"/>
-                    <path d="M5.6,6.6c-0.3,0-0.5-0.1-0.7-0.3L3.5,4.9c-0.4-0.4-0.4-1,0-1.4s1-0.4,1.4,0l1.4,1.4c0.4,0.4,0.4,1,0,1.4C6.2,6.5,5.9,6.6,5.6,6.6z"/>
-                    <path d="M19.8,20.8c-0.3,0-0.5-0.1-0.7-0.3l-1.4-1.4c-0.4-0.4-0.4-1,0-1.4s1-0.4,1.4,0l1.4,1.4c0.4,0.4,0.4,1,0,1.4C20.3,20.7,20,20.8,19.8,20.8z"/>
-                    <path d="M4,13H2c-0.6,0-1-0.4-1-1s0.4-1,1-1h2c0.6,0,1,0.4,1,1S4.6,13,4,13z"/>
-                    <path d="M22,13h-2c-0.6,0-1-0.4-1-1s0.4-1,1-1h2c0.6,0,1,0.4,1,1S22.6,13,22,13z"/>
-                    <path d="M4.2,20.8c-0.3,0-0.5-0.1-0.7-0.3c-0.4-0.4-0.4-1,0-1.4l1.4-1.4c0.4-0.4,1-0.4,1.4,0s0.4,1,0,1.4l-1.4,1.4C4.7,20.7,4.5,20.8,4.2,20.8z"/>
-                    <path d="M18.4,6.6c-0.3,0-0.5-0.1-0.7-0.3c-0.4-0.4-0.4-1,0-1.4l1.4-1.4c0.4-0.4,1-0.4,1.4,0s0.4,1,0,1.4l-1.4,1.4C18.9,6.5,18.6,6.6,18.4,6.6z"/>
-                `;
-            }
-        }
     }
 }
 // Initialize the application when DOM is loaded (only in browser environment)
