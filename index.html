@@ -63,6 +63,20 @@
             </div>
              <div id="site-mappings-container">
                  <!-- Site mappings will be added here -->
+            </div>
+            <div class="import-site-data-container">
+                <div class="import-site-data-header">
+                    <h2 class="import-site-data-text">Import Site Mappings</h2>
+                    <span class="import-site-data-close">×</span></div>
+                <div class="import-site-data-type">
+                    <div class="import-site-data-item" id="paste-as-json">
+                        <span>Paste as JSON</span>
+                        <textarea id="paste-as-json-textarea"></textarea>
+                    </div>
+                    <div class="import-site-data-item" id="upload-or-drag-drop">
+                        <span>Click to upload or drag and drop</span>
+                    </div>
+                </div>                
             </div>      
             <div id="no-result">No matching sites found</div>
             <div class="error-message" id="mapping-error">Both site key and display name are required.</div>
@@ -70,8 +84,12 @@
                 <span class="total-sites">Total Count : </span>
                 <span id="total-sites-count"></span>
             </div>
-          <button class="add-site-btn" id="add-site-btn">Add New Site</button>
-            <button class="save-sites-btn" id="save-sites-btn">Save Changes</button>
+            <div class="button-group">
+                <button class="add-site-btn" id="add-site-btn">Add New Site</button>
+                <button class="save-sites-btn" id="save-sites-btn">Save Changes</button>
+                <button class="export-sites-btn" id="export-sites-btn">Export</button>
+                <button class="import-sites-btn" id="import-sites-btn">Import</button>
+            </div>
         </div>
     </div>
 

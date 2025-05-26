@@ -18,6 +18,10 @@ try {
     console.log('No siteMappings.js found, starting with empty mappings');
 }
 
+// Import the site exporter and importer
+import { SiteExporter } from './exportSites.js';
+import { SiteImporter } from './importSites.js';
+
 // Server-side code (Only runs if this file is executed with Node.js)
 if (typeof window === 'undefined') {
     const express = require('express');
@@ -61,7 +65,24 @@ class VideoFilenameFormatter {
         this.siteMappingsContainer = document.getElementById('site-mappings-container');
         this.addSiteBtn = document.getElementById('add-site-btn');
         this.saveSitesBtn = document.getElementById('save-sites-btn');
+        this.exportSitesBtn = document.getElementById('export-sites-btn');
+        this.importSitesBtn = document.getElementById('import-sites-btn');
         this.mappingError = document.getElementById('mapping-error');
+
+        // Initialize import option elements
+        this.pasteAsJson = document.getElementById('paste-as-json');
+        this.uploadOrDragDrop = document.getElementById('upload-or-drag-drop');
+
+        // Initialize site exporter and importer
+        this.siteExporter = new SiteExporter(this.siteMappingsContainer);
+        this.siteImporter = new SiteImporter(
+            this.siteMappingsContainer,
+            this.addSiteMappingRow.bind(this),
+            this.validateInputs.bind(this),
+            this.countSiteMappings.bind(this),
+            this.mappingError
+        );
+
         // Initialize event listeners
         this.initEventListeners();
         this.updateConnectionStatus();
@@ -98,6 +119,140 @@ class VideoFilenameFormatter {
             }
         });
 
+        // Import options click handlers
+        if (this.pasteAsJson && this.uploadOrDragDrop) {
+            this.pasteAsJson.addEventListener('click', () => {
+                this.pasteAsJson.classList.add('expanded');
+                this.uploadOrDragDrop.classList.add('hidden');
+                
+                // Set the formatted placeholder text
+                const textarea = document.getElementById('paste-as-json-textarea');
+                const importBtn = document.querySelector('.import-sites-btn');
+                
+                if (textarea) {
+                    textarea.placeholder = '{\n\n\n    // Paste JSON here...\n\n    // All of these will work: \n\n    {\n       "key": "value\n       \'key\': \'value\'\n       \'key\': "value"\n       "key with \'quote\'": \'value with "quote"\'\n    }\n\n\n}';
+                    
+                    // Helper function to normalize JSON with single quotes
+                    const normalizeJSON = (text) => {
+                        try {
+                            // First try parsing as is (might be valid double-quoted JSON)
+                            return JSON.parse(text);
+                        } catch (e) {
+                            try {
+                                // If that fails, try converting single quotes to double quotes
+                                // But first, we need to handle escaped single quotes
+                                const normalized = text
+                                    .replace(/\\'/g, "___ESCAPED_SINGLE_QUOTE___") // Temporarily replace escaped single quotes
+                                    .replace(/'/g, '"') // Replace single quotes with double quotes
+                                    .replace(/___ESCAPED_SINGLE_QUOTE___/g, "\\'"); // Restore escaped single quotes
+                                return JSON.parse(normalized);
+                            } catch (e2) {
+                                throw new Error('Invalid JSON format');
+                            }
+                        }
+                    };
+                    
+                    // Add input event listener for JSON validation
+                    textarea.addEventListener('input', () => {
+                        const text = textarea.value.trim();
+                        
+                        if (!text) {
+                            importBtn.style.display = 'none';
+                            return;
+                        }
+                        
+                        try {
+                            const json = normalizeJSON(text);
+                            // Check if it's an object with string key-value pairs
+                            if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
+                                const isValid = Object.entries(json).every(([key, value]) => 
+                                    typeof key === 'string' && typeof value === 'string'
+                                );
+                                importBtn.style.display = isValid ? 'block' : 'none';
+                            } else {
+                                importBtn.style.display = 'none';
+                            }
+                        } catch (e) {
+                            importBtn.style.display = 'none';
+                        }
+                    });
+                    
+                    // Initially hide the import button
+                    importBtn.style.display = 'none';
+                    
+                    // Add click handler for import button
+                    importBtn.addEventListener('click', () => {
+                        const text = textarea.value.trim();
+                        try {
+                            const mappings = normalizeJSON(text);
+                            
+                            // Clear existing mappings
+                            this.siteMappingsContainer.innerHTML = '';
+                            
+                            // Add each mapping
+                            Object.entries(mappings).forEach(([key, value]) => {
+                                if (typeof key === 'string' && typeof value === 'string') {
+                                    this.addSiteMappingRow(key.trim().toLowerCase(), value.trim(), false);
+                                }
+                            });
+                            
+                            // Update counts and validate
+                            this.countSiteMappings();
+                            this.validateInputs();
+                            
+                            // Reset the import area
+                            const importContainer = document.querySelector('.import-site-data-container');
+                            const siteMappingsHeader = document.getElementById('site-mappings-header');
+                            const siteMappingsContainer = document.getElementById('site-mappings-container');
+                            
+                            if (importContainer) importContainer.style.display = 'none';
+                            if (siteMappingsHeader) siteMappingsHeader.style.display = 'block';
+                            if (siteMappingsContainer) siteMappingsContainer.style.display = 'block';
+                            
+                            // Show success message
+                            const updateNotice = document.createElement('div');
+                            updateNotice.style.backgroundColor = '#27ae60';
+                            updateNotice.style.color = 'white';
+                            updateNotice.style.padding = '10px';
+                            updateNotice.style.borderRadius = '4px';
+                            updateNotice.style.marginTop = '10px';
+                            updateNotice.style.textAlign = 'center';
+                            updateNotice.innerHTML = 'Site mappings imported successfully!';
+                            this.siteMappingsContainer.parentNode.insertBefore(updateNotice, this.siteMappingsContainer.nextSibling);
+                            
+                            // Remove notice after delay
+                            setTimeout(() => {
+                                updateNotice.style.opacity = '0';
+                                updateNotice.style.transition = 'opacity 0.5s ease';
+                                setTimeout(() => updateNotice.remove(), 500);
+                            }, 3000);
+                            
+                            // Save the mappings
+                            this.saveSiteMappingsHandler();
+                            
+                        } catch (error) {
+                            console.error('Import error:', error);
+                            this.mappingError.textContent = 'Error importing JSON. Please ensure it\'s valid.';
+                            this.mappingError.style.display = 'block';
+                        }
+                    });
+                }
+            });
+
+            this.uploadOrDragDrop.addEventListener('click', () => {
+                this.uploadOrDragDrop.classList.add('expanded');
+                this.pasteAsJson.classList.add('hidden');
+            });
+
+            // Handle click outside
+            document.addEventListener('click', (event) => {
+                if (!event.target.closest('.import-site-data-type')) {
+                    this.pasteAsJson.classList.remove('expanded', 'hidden');
+                    this.uploadOrDragDrop.classList.remove('expanded', 'hidden');
+                }
+            });
+        }
+
         this.manageSitesBtn.addEventListener('click', () => {
             this.populateSiteMappings();
             this.mappingError.style.display = 'none';
@@ -115,6 +270,32 @@ class VideoFilenameFormatter {
             this.addEmptySiteRow();
         });
         this.saveSitesBtn.addEventListener('click', () => this.saveSiteMappingsHandler());
+        this.exportSitesBtn.addEventListener('click', () => this.siteExporter.exportMappings());
+        this.importSitesBtn.addEventListener('click', () => {
+            // Hide site mappings header and container
+            const siteMappingsHeader = document.getElementById('site-mappings-header');
+            const siteMappingsContainer = document.getElementById('site-mappings-container');
+            const importSiteDataContainer = document.querySelector('.import-site-data-container');
+            
+            if (siteMappingsHeader) siteMappingsHeader.style.display = 'none';
+            if (siteMappingsContainer) siteMappingsContainer.style.display = 'none';
+            if (importSiteDataContainer) importSiteDataContainer.style.display = 'block';
+        });
+
+        // Add event listener for import-site-data-close
+        const importSiteDataClose = document.querySelector('.import-site-data-close');
+        if (importSiteDataClose) {
+            importSiteDataClose.addEventListener('click', () => {
+                const importSiteDataContainer = document.querySelector('.import-site-data-container');
+                const siteMappingsHeader = document.getElementById('site-mappings-header');
+                const siteMappingsContainer = document.getElementById('site-mappings-container');
+                
+                if (importSiteDataContainer) importSiteDataContainer.style.display = 'none';
+                if (siteMappingsHeader) siteMappingsHeader.style.display = 'block';
+                if (siteMappingsContainer) siteMappingsContainer.style.display = 'block';
+            });
+        }
+
         // Network status listeners
         window.addEventListener('online', () => {
             this.updateConnectionStatus();
