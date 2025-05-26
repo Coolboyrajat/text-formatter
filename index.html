@@ -56,7 +56,10 @@
             <span class="close">&times;</span>
             <div id="site-mappings-header">
                 <h2>Manage Site Name Mappings</h2>
-                <input type="text" id="search-box" placeholder="Search Sites">
+                <div class="input-wrapper">
+                    <input type="text" id="search-box" placeholder="Search Sites">
+                    <button class="clear-input" type="button">×</button>
+                </div>
             </div>
              <div id="site-mappings-container">
                  <!-- Site mappings will be added here -->
@@ -75,6 +78,6 @@
     <script src="https://s3.amazonaws.com/stitch-sdks/js/bundles/4.6.0/stitch.js"></script>
     <script src="theme.js"></script>
     <script src="mongodb.js"></script>
-    <script type="module" src="script.js"></script>
+    <script type="module" async defer src="script.js"></script>
 </body>
 </html>
