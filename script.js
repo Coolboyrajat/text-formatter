@@ -9,8 +9,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 
-// Import default mappings
-import { defaultSiteNameMapping } from './siteMappings.js';
+// Import default mappings with fallback
+let defaultSiteNameMapping = {};
+try {
+    const module = await import('./siteMappings.js');
+    defaultSiteNameMapping = module.defaultSiteNameMapping || {};
+} catch (error) {
+    console.log('No siteMappings.js found, starting with empty mappings');
+}
 
 // Server-side code (Only runs if this file is executed with Node.js)
 if (typeof window === 'undefined') {
@@ -35,7 +41,8 @@ if (typeof window === 'undefined') {
 // App class to encapsulate application logic
 class VideoFilenameFormatter {
     constructor() {
-        this.siteNameMapping = Object.assign({}, defaultSiteNameMapping);
+        // Initialize with empty object if defaultSiteNameMapping doesn't exist
+        this.siteNameMapping = typeof defaultSiteNameMapping !== 'undefined' ? Object.assign({}, defaultSiteNameMapping) : {};
         this.pendingSort = false;
         this.sortTimeout = null;
         this.isOnline = navigator.onLine;
@@ -119,7 +126,30 @@ class VideoFilenameFormatter {
          // Search functionality
          const searchBox = document.getElementById('search-box');
          const noResultText = document.getElementById('no-result');
+         
+         // Function to update search box clear button visibility
+         const updateSearchClearButton = () => {
+             const clearBtn = searchBox.parentElement.querySelector('.clear-input');
+             if (clearBtn) {
+                 clearBtn.style.display = searchBox.value.trim() ? 'block' : 'none';
+             }
+         };
+
+         // Add clear button functionality
+         const searchClearBtn = searchBox.parentElement.querySelector('.clear-input');
+         if (searchClearBtn) {
+             searchClearBtn.addEventListener('click', () => {
+                 searchBox.value = '';
+                 searchBox.focus();
+                 updateSearchClearButton();
+                 // Trigger the input event to update the search results
+                 searchBox.dispatchEvent(new Event('input'));
+             });
+         }
+
+         // Update clear button visibility on input
          searchBox.addEventListener('input', () => {
+            updateSearchClearButton();
             const searchTerm = searchBox.value.trim().toLowerCase();
             const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
             let hasVisibleRows = false;
@@ -133,6 +163,9 @@ class VideoFilenameFormatter {
             // Show "No Result" if no rows are visible
             noResultText.style.display = hasVisibleRows ? 'none' : 'block';
          });
+
+         // Initialize clear button visibility
+         updateSearchClearButton();
     }
     countSiteMappings() {
         // Get all the site mapping rows
@@ -962,7 +995,9 @@ class VideoFilenameFormatter {
             const customMappings = {};
             Object.keys(newMappings).sort().forEach(key => {
                 // Store only the custom mappings (ones that differ from defaults or are new)
-                if (defaultSiteNameMapping[key] !== newMappings[key] || !(key in defaultSiteNameMapping)) {
+                if (typeof defaultSiteNameMapping === 'undefined' || 
+                    defaultSiteNameMapping[key] !== newMappings[key] || 
+                    !(key in defaultSiteNameMapping)) {
                     customMappings[key] = newMappings[key];
                 }
             });
@@ -985,7 +1020,9 @@ class VideoFilenameFormatter {
             }
             
             // Update the working mapping with all values
-            this.siteNameMapping = Object.assign({}, defaultSiteNameMapping, newMappings);
+            this.siteNameMapping = typeof defaultSiteNameMapping !== 'undefined' ? 
+                Object.assign({}, defaultSiteNameMapping, newMappings) : 
+                Object.assign({}, newMappings);
             
             // Sort the full mapping
             const sortedKeys = Object.keys(this.siteNameMapping).sort();
@@ -1024,7 +1061,16 @@ class VideoFilenameFormatter {
 }
 // Initialize the application when DOM is loaded (only in browser environment)
 if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
+    // Wait for both DOM content and module loading
+    Promise.all([
+        new Promise(resolve => {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', resolve);
+            } else {
+                resolve();
+            }
+        })
+    ]).then(() => {
         new VideoFilenameFormatter();
     });
 }
