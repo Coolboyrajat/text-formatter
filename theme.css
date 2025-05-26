@@ -1,5 +1,18 @@
-
 :root {
+    /* Base colors */
+    --primary-color: #3498db;
+    --primary-hover: #2980b9;
+    --success-color: #27ae60;
+    --success-hover: #219653;
+    --warning-color: #f39c12;
+    --warning-hover: #e67e22;
+    --danger-color: #e74c3c;
+    --danger-hover: #c0392b;
+    --alert-bg: #fff3cd;
+    --alert-text: #856404;
+    --alert-border: #ffc107;
+
+    /* Theme colors */
     --bg-color: #f5f5f5;
     --text-color: #333;
     --container-bg: white;
@@ -7,11 +20,13 @@
     --border-color: #ddd;
     --output-bg: #f8f9fa;
     --modal-bg: #fefefe;
+    --modal-bg-rgb: 254, 254, 254;
     --shadow-color: rgba(0,0,0,0.1);
     --modal-overlay: rgba(0,0,0,0.4);
 }
 
 body.dark-mode {
+    /* Theme colors - dark mode */
     --bg-color: #1a1a1a;
     --text-color: #e0e0e0;
     --container-bg: #2d2d2d;
@@ -19,8 +34,14 @@ body.dark-mode {
     --border-color: #444;
     --output-bg: #3d3d3d;
     --modal-bg: #2d2d2d;
+    --modal-bg-rgb: 45, 45, 45;
     --shadow-color: rgba(0,0,0,0.3);
     --modal-overlay: rgba(0,0,0,0.7);
+
+    /* Alert colors - dark mode */
+    --alert-bg: #483e15;
+    --alert-text: #ffc107;
+    --alert-border: #ffc107;
 }
 
 /* Theme toggle is now defined in style.css */
