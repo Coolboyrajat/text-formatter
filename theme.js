@@ -27,6 +27,13 @@
       }
   };
 
+  function updateThemeButtonIcon(isDarkMode) {
+      const themeIcon = document.getElementById('theme-icon');
+      if (themeIcon && window.updateThemeIcon) {
+          window.updateThemeIcon(isDarkMode, themeIcon);
+      }
+  }
+
   // Event listener for when the DOM content is loaded
   document.addEventListener('DOMContentLoaded', function() {
       // Apply theme based on saved preference or system preference
@@ -48,12 +55,5 @@
           });
       }
   });
-
-  function updateThemeButtonIcon(isDarkMode) {
-      const themeIcon = document.getElementById('theme-icon');
-      if (themeIcon && window.updateThemeIcon) {
-          window.updateThemeIcon(isDarkMode, themeIcon);
-      }
-  }
 
 })();
