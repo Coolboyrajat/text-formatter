@@ -357,6 +357,11 @@ class VideoFilenameFormatter {
         const totalCountElement = document.getElementById('total-sites-count');
         if (totalCountElement)
             totalCountElement.textContent = count.toString();
+            
+        // Hide/show export button based on count
+        if (this.exportSitesBtn) {
+            this.exportSitesBtn.style.display = count === 0 ? 'none' : 'block';
+        }
     }
     updateConnectionStatus() {
         this.isOnline = navigator.onLine;
