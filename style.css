@@ -58,7 +58,32 @@ button:hover{transform:scale(1.05)}
 .add-site-btn:hover{background-color:var(--success-hover)}
 .save-sites-btn{background-color:var(--warning-color)}
 .save-sites-btn:hover{background-color:var(--warning-hover)}
-.button-group {display: flex;margin-top: 1rem;}
+.button-group {
+    display: flex;
+    margin-top: 1rem;
+    gap: 10px;
+}
+
+.button-group button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+}
+
+.button-group button .icon {
+    font-size: 20px;
+    color: white;
+}
+
+.button-group button .icon-save {
+    font-size: 18px;
+}
+
+.button-group button .icon-add {
+    font-size: 16px;
+}
+
 .export-sites-btn{background-color:var(--primary-color)}
 .export-sites-btn:hover{background-color:var(--primary-hover)}
 .import-sites-btn{background-color:var(--success-color)}
