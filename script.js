@@ -52,6 +52,8 @@ class VideoFilenameFormatter {
         this.isOnline = navigator.onLine;
         this.db = null;
         this.siteCollection = null;
+        // Temporary storage for mappings being edited in the modal
+        this.workingMappings = null;
         // Initialize DOM elements
         this.connectionStatus = document.getElementById('connection-status');
         this.formatBtn = document.getElementById('format-btn');
@@ -197,7 +199,7 @@ class VideoFilenameFormatter {
                             });
                             
                             // Update counts and validate
-                            this.countSiteMappings();
+                            this.updateExportButtonVisibility(); // Only update button visibility, not count
                             this.validateInputs();
                             
                             // Reset the import area
@@ -254,15 +256,21 @@ class VideoFilenameFormatter {
         }
 
         this.manageSitesBtn.addEventListener('click', () => {
+            // Create a deep copy of current mappings for editing
+            this.workingMappings = JSON.parse(JSON.stringify(this.siteNameMapping));
             this.populateSiteMappings();
             this.mappingError.style.display = 'none';
             this.siteModal.style.display = 'block';
         });
         this.closeModalBtn.addEventListener('click', () => {
+            // Discard changes when modal is closed without saving
+            this.workingMappings = null;
             this.siteModal.style.display = 'none';
         });
         window.addEventListener('click', (event) => {
             if (event.target === this.siteModal) {
+                // Discard changes when modal is closed without saving
+                this.workingMappings = null;
                 this.siteModal.style.display = 'none';
             }
         });
@@ -348,20 +356,21 @@ class VideoFilenameFormatter {
          // Initialize clear button visibility
          updateSearchClearButton();
     }
-    countSiteMappings() {
+    countSiteMappings(updateDisplay = false) {
         // Get all the site mapping rows
         const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
         // Count them
         const count = rows.length;
-        // Update the total-sites-count element
-        const totalCountElement = document.getElementById('total-sites-count');
-        if (totalCountElement)
-            totalCountElement.textContent = count.toString();
-            
-        // Hide/show export button based on count
-        if (this.exportSitesBtn) {
-            this.exportSitesBtn.style.display = count === 0 ? 'none' : 'block';
+        
+        // Only update the display if explicitly requested
+        if (updateDisplay) {
+            const totalCountElement = document.getElementById('total-sites-count');
+            if (totalCountElement)
+                totalCountElement.textContent = count.toString();
         }
+        
+        this.updateExportButtonVisibility();
+        return count;
     }
     updateConnectionStatus() {
         this.isOnline = navigator.onLine;
@@ -707,6 +716,11 @@ class VideoFilenameFormatter {
     }
     
     handleUnmappedSites(unmappedSites, originalInput) {
+        // Initialize working mappings if needed
+        if (!this.workingMappings) {
+            this.workingMappings = JSON.parse(JSON.stringify(this.siteNameMapping));
+        }
+        
         // Open the site modal
         this.populateSiteMappings();
         this.siteModal.style.display = 'block';
@@ -963,11 +977,16 @@ class VideoFilenameFormatter {
     }
     populateSiteMappings() {
         this.siteMappingsContainer.innerHTML = '';
-        const entries = Object.entries(this.siteNameMapping).sort((a, b) => a[0].localeCompare(b[0]));
+        
+        // Use workingMappings if available (when modal is open), otherwise use siteNameMapping
+        const sourceMappings = this.workingMappings || this.siteNameMapping;
+        
+        const entries = Object.entries(sourceMappings).sort((a, b) => a[0].localeCompare(b[0]));
         entries.forEach(([key, value]) => {
             this.addSiteMappingRow(key, value, false);
         });
-        this.countSiteMappings();
+        // Update the count display when populating from saved data
+        this.countSiteMappings(true);
     }
     validateInputs() {
         const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
@@ -1083,9 +1102,10 @@ class VideoFilenameFormatter {
         removeBtn.addEventListener('click', () => {
             row.style.opacity = '0';
             setTimeout(() => {
-                this.countSiteMappings();
                 row.remove();
                 this.validateInputs();
+                // Update count immediately when removing a site
+                this.countSiteMappings(true);
             }, 300);
         });
         // Append elements to their wrappers
@@ -1113,7 +1133,13 @@ class VideoFilenameFormatter {
         else {
             this.siteMappingsContainer.appendChild(row);
         }
-        this.countSiteMappings();
+        
+        // Only update count when we're populating existing data (not isNew)
+        // This ensures we don't update the count when adding a new empty row
+        if (!isNew) {
+            this.updateExportButtonVisibility();
+        }
+        
         return row;
     }
     addEmptySiteRow() {
@@ -1205,6 +1231,10 @@ class VideoFilenameFormatter {
                 console.error('Error saving to localStorage:', error);
             }
             
+            // First, update our working mappings with the form values
+            this.workingMappings = newMappings;
+            
+            // Then, update the actual siteNameMapping once saved
             // Update the working mapping with all values
             this.siteNameMapping = typeof defaultSiteNameMapping !== 'undefined' ? 
                 Object.assign({}, defaultSiteNameMapping, newMappings) : 
@@ -1236,13 +1266,25 @@ class VideoFilenameFormatter {
                 setTimeout(() => updateNotice.remove(), 500);
             }, 3000);
             
+            // Clear workingMappings after save
+            this.workingMappings = null;
+            
             // Repopulate to ensure alphabetical order and close modal
             this.populateSiteMappings();
             this.siteModal.style.display = 'none';
-            this.countSiteMappings();
+            
+            // Update the count display after successful save
+            this.countSiteMappings(true);
             
             return true; // Indicate successful save
         });
+    }
+    updateExportButtonVisibility() {
+        const rows = this.siteMappingsContainer.querySelectorAll('.site-row');
+        // Hide/show export button based on count
+        if (this.exportSitesBtn) {
+            this.exportSitesBtn.style.display = rows.length === 0 ? 'none' : 'block';
+        }
     }
 }
 // Initialize the application when DOM is loaded (only in browser environment)

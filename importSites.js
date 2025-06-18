@@ -76,7 +76,7 @@ export class SiteImporter {
                 });
 
                 // Update counts and validate
-                this.countSiteMappings();
+                this.countSiteMappings(true);
                 this.validateInputs();
 
                 // Show success message
