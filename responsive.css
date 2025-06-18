@@ -1,0 +1,70 @@
+/* 
+ * Responsive styling for text-formatter
+ * This file contains all media queries and responsive layout adjustments
+ */
+
+/* Default behavior: buttons in the same row share available space equally */
+@media (min-width: 768px) {
+    .button-group button {
+        flex: 1;
+    }
+}
+
+/* When buttons wrap to a new row, they should hug content */
+@media (max-width: 767px) {
+    .button-group button {
+        flex: 0 1 auto; /* Don't grow, can shrink a bit, width based on content */
+    }
+    
+    /* Ensure there's always at least one button that fills in case of extra space */
+    .button-group button:nth-child(odd) {
+        flex: 1 1 auto; /* Will grow to fill space */
+    }
+}
+
+@media (max-width: 576px) {
+    .button-group {
+        gap: 12px; /* Slightly smaller on mobile */
+    }
+    
+    .button-group button {
+        min-width: fit-content; /* Hug content on mobile */
+        padding: 8px 12px; /* Slightly reduced padding */
+    }
+    
+    /* Other responsive adjustments for small screens */
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        padding: 15px;
+    }
+}
+
+/* For very small screens */
+@media (max-width: 400px) {
+    .button-group {
+        gap: 6px 14px; /* Horizontal/vertical gap */
+    }
+    
+    .button-group button {
+        min-width: fit-content; /* Hug content rather than filling */
+        margin-bottom: 5px;
+    }
+    
+    /* Other very small screen adjustments */
+    h1 {
+        font-size: 1.5rem;
+    }
+    
+    button {
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+    
+    .modal-content {
+        padding: 15px;
+        width: 95%;
+    }
+} 
