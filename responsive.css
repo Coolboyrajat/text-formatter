@@ -6,7 +6,7 @@
 /* Default behavior: buttons in the same row share available space equally */
 @media (min-width: 768px) {
     .button-group button {
-        flex: 1;
+        flex: 0;
     }
 }
 
