@@ -18,7 +18,7 @@
 
     <div class="header-controls">
         <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">
-            <i class="icon icon-theme"></i>
+            <i class="icon icon-light"></i>
         </button>
     </div>
 
@@ -29,7 +29,9 @@
         <textarea id="input-text" placeholder="Enter the text here..."></textarea>
 
         <div class="button-container">
-            <button id="format-btn">Format Filenames</button>
+            <button id="format-btn" class="format-btn">
+                <i class="icon icon-text"></i>
+                Format Filenames</button>
             <button id="clear-btn" class="clear-btn">Clear</button>
         </div>
 
@@ -94,9 +96,7 @@
         </div>
     </div>
 
-    <script src="https://s3.amazonaws.com/stitch-sdks/js/bundles/4.6.0/stitch.js"></script>
     <script src="theme.js"></script>
-    <script src="mongodb.js"></script>
     <script type="module" async defer src="script.js"></script>
 </body>
 </html>
