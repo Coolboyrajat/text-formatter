@@ -265,3 +265,47 @@ body.dark-mode .unmapped-sites-alert{background-color: var(--alert-bg);color: va
 body.dark-mode #paste-as-json::before, #upload-or-drag-drop::before {
     filter: invert(1);
 }
+
+/* Conflicts Modal Styles */
+.conflicts-table {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-top: 10px;
+    background-color: var(--input-bg-color);
+}
+
+.conflicts-row {
+    transition: background-color 0.2s;
+}
+
+.conflicts-row:not(.header):hover {
+    background-color: var(--hover-color);
+}
+
+.conflicts-row.header {
+    background-color: var(--secondary-bg-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.conflicts-row label {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.conflicts-row input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+/* Duplicates Modal Styles */
+.duplicates-modal h2 {
+    color: var(--text-color);
+    margin-bottom: 10px;
+}
+
+.duplicates-modal p {
+    margin-bottom: 15px;
+    color: var(--text-color);
+}
