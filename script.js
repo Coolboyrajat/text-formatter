@@ -188,49 +188,8 @@ class VideoFilenameFormatter {
                         try {
                             const mappings = normalizeJSON(text);
                             
-                            // Clear existing mappings
-                            this.siteMappingsContainer.innerHTML = '';
-                            
-                            // Add each mapping
-                            Object.entries(mappings).forEach(([key, value]) => {
-                                if (typeof key === 'string' && typeof value === 'string') {
-                                    this.addSiteMappingRow(key.trim().toLowerCase(), value.trim(), false);
-                                }
-                            });
-                            
-                            // Update counts and validate
-                            this.updateExportButtonVisibility(); // Only update button visibility, not count
-                            this.validateInputs();
-                            
-                            // Reset the import area
-                            const importContainer = document.querySelector('.import-site-data-container');
-                            const siteMappingsHeader = document.getElementById('site-mappings-header');
-                            const siteMappingsContainer = document.getElementById('site-mappings-container');
-                            
-                            if (importContainer) importContainer.style.display = 'none';
-                            if (siteMappingsHeader) siteMappingsHeader.style.display = 'block';
-                            if (siteMappingsContainer) siteMappingsContainer.style.display = 'block';
-                            
-                            // Show success message
-                            const updateNotice = document.createElement('div');
-                            updateNotice.style.backgroundColor = '#27ae60';
-                            updateNotice.style.color = 'white';
-                            updateNotice.style.padding = '10px';
-                            updateNotice.style.borderRadius = '4px';
-                            updateNotice.style.marginTop = '10px';
-                            updateNotice.style.textAlign = 'center';
-                            updateNotice.innerHTML = 'Site mappings imported successfully!';
-                            this.siteMappingsContainer.parentNode.insertBefore(updateNotice, this.siteMappingsContainer.nextSibling);
-                            
-                            // Remove notice after delay
-                            setTimeout(() => {
-                                updateNotice.style.opacity = '0';
-                                updateNotice.style.transition = 'opacity 0.5s ease';
-                                setTimeout(() => updateNotice.remove(), 500);
-                            }, 3000);
-                            
-                            // Save the mappings
-                            this.saveSiteMappingsHandler();
+                            // Use the SiteImporter's processMappings method
+                            this.siteImporter.processMappings(mappings);
                             
                         } catch (error) {
                             console.error('Import error:', error);
